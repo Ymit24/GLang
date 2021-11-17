@@ -77,10 +77,21 @@ namespace AntlrTest
             string ASM = $"\n;function declaration {context.SYMBOL_NAME().GetText()}\n{context.SYMBOL_NAME().GetText()}:\n" +
                           "push ebp\n" +
                           "mov ebp, esp\n";
-
+            
             var stmt_block = context.statement_block();
 
+            var parameters = context.function_parameter_decl();
+
+            if (parameters.Length != 0)
+            {
+                ScopeStack.PushParameterScope();
+                foreach (var parameter in parameters)
+                {
+                    ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), GetDataType(parameter.DATATYPE().GetText()));
+                }
+            }
             ScopeStack.PushFunctionScope();
+            
             string innerASM = "";
             foreach (var stmt in stmt_block.statement())
             {
@@ -88,23 +99,34 @@ namespace AntlrTest
             }
             ASM += $"sub esp, {ScopeStack.GetFunctionScopeSize() - 4}\n"; // Remove starting offset bias.
             ASM += innerASM + $"\n;end function {context.SYMBOL_NAME().GetText()}\n";
+            
             ScopeStack.PopFunctionScope();
-
+            if (parameters.Length != 0)
+            {
+                ScopeStack.PopParameterScope();
+            }
             return ASM;
+        }
+
+        public GDataType GetDataType(string datatypeString)
+        {
+            GDataType type = GDataType.I32;
+            switch (datatypeString.ToLower())
+            {
+                case "i8": { type = GDataType.I8; break; }
+                case "i16": { type = GDataType.I16; break; }
+                case "i32": { type = GDataType.I32; break; }
+                default: { type = GDataType.I32; break; }
+            }
+            return type;
         }
 
         public override string VisitVariable_assignment([NotNull] gLangParser.Variable_assignmentContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
             string datatype = context.DATATYPE().GetText();
-            ScopeStack.GDataType type = ScopeStack.GDataType.I32;
-            switch (datatype.ToLower())
-            {
-                case "i8": { type = ScopeStack.GDataType.I8; break; }
-                case "i16": { type = ScopeStack.GDataType.I16; break; }
-                case "i32": { type = ScopeStack.GDataType.I32; break; }
-                default: { type = ScopeStack.GDataType.I32; break; }
-            }
+            GDataType type = GetDataType(datatype);
+
             int offset = ScopeStack.IncludeSymbol(symbolName, type);
             if (offset == -1)
             {
@@ -115,7 +137,8 @@ namespace AntlrTest
 
             asm += EvaluateExpressionASM(context.expression());
 
-            asm += $"mov [ebp-{offset}], eax\n";
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"{offset}";
+            asm += $"mov [ebp{offsetValue}], eax\n";
             return asm;
         }
 

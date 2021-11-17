@@ -115,7 +115,8 @@ namespace AntlrTest
                 Console.WriteLine("failed to find offset for symbol: " + symbol);
                 return "push DWORD 0\n";
             }
-            return $"push DWORD [ebp-{offset}] ; Push {symbol}\n"; // TODO: respect datasize.
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"{offset}";
+            return $"push DWORD [ebp{offsetValue}] ; Push {symbol}\n"; // TODO: respect datasize.
         }
     }
 
