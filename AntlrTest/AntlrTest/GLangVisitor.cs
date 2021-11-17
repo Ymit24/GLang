@@ -137,7 +137,7 @@ namespace AntlrTest
 
             asm += EvaluateExpressionASM(context.expression());
 
-            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"{offset}";
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
             asm += $"mov [ebp{offsetValue}], eax\n";
             return asm;
         }

@@ -49,6 +49,7 @@ expression
 	| expression PLUS expression #AddExpr
 	| expression MINUS expression #SubExpr
 	| LPAREN expression RPAREN #ParenExpr
+	| function_call #FuncCallExpr
 	| NUMBER #NumberLiteral
 	| SYMBOL_NAME #SymbolLiteral
 	| STRING #StringLiteral
