@@ -153,7 +153,14 @@ namespace AntlrTest
 
         public override string VisitReturn_stmt([NotNull] gLangParser.Return_stmtContext context)
         {
-            return "\n;return\n" +
+            string asm = "";
+            if (context.expression() != null)
+            {
+                asm += EvaluateExpressionASM(context.expression());
+            }
+
+            return asm +
+                   "\n;return\n" +
                    "mov esp, ebp\n" +
                    "pop ebp\n" +
                    "ret\n";

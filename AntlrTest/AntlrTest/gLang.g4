@@ -40,7 +40,7 @@ function_call
 function_arguments
 	: expression (COMMA expression)*;
 
-return_stmt	: RETURN;
+return_stmt	: RETURN expression?;
 
 expression
 	: MINUS expression #NegateExpr
