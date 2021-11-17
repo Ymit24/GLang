@@ -42,7 +42,7 @@ namespace AntlrTest
                 symbolTable.Add(symbolName, currentOffset);
                 int cacheOffset = currentOffset;
 
-                currentOffset += Math.Min(2, GData.GetByteSize(type));
+                currentOffset += Math.Min(4, GData.GetByteSize(type));
 
                 return cacheOffset;
             }
