@@ -121,7 +121,7 @@ namespace AntlrTest
             return type;
         }
 
-        public override string VisitVariable_assignment([NotNull] gLangParser.Variable_assignmentContext context)
+        public override string VisitVaraibleDecl([NotNull] gLangParser.VaraibleDeclContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
             string datatype = context.DATATYPE().GetText();
@@ -132,7 +132,7 @@ namespace AntlrTest
             {
                 Console.WriteLine("Failed to get offset for symbol.");
             }
-            
+
             string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
 
             asm += EvaluateExpressionASM(context.expression());
@@ -141,6 +141,62 @@ namespace AntlrTest
             asm += $"mov [ebp{offsetValue}], eax\n";
             return asm;
         }
+
+        public override string VisitVariableAssign([NotNull] gLangParser.VariableAssignContext context)
+        {
+            string symbolName = context.SYMBOL_NAME().GetText();
+
+            int offset = ScopeStack.GetSymbolOffset(symbolName);
+            if (offset == -1)
+            {
+                Console.WriteLine("Failed to get offset for symbol.");
+            }
+
+            string asm = $"\n;variable {(context.DOLLAR()==null ? "" : "$")}{symbolName}={context.expression().GetText()}\n";
+
+            asm += EvaluateExpressionASM(context.expression());
+
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
+            if (context.DOLLAR() == null)
+            {
+                asm += $"mov [ebp{offsetValue}], eax\n";
+            }
+            else
+            {
+                asm += $"lea edx, [ebp{offsetValue}] ; Move address of pointer varaible into edx\n" +
+                       $"mov edx, [edx] ; Deref the pointer into edx\n" +
+                       $"mov [edx], eax ; mov right hand result into address in edx.\n";
+            }
+            return asm;
+        }
+        //public override string VisitVariable_assignment([NotNull] gLangParser.Variable_assignmentContext context)
+        //{
+        //    string symbolName = context.SYMBOL_NAME().GetText();
+        //    string datatype = context.DATATYPE().GetText();
+        //    GDataType type = GetDataType(datatype);
+
+        //    int offset = ScopeStack.IncludeSymbol(symbolName, type);
+        //    if (offset == -1)
+        //    {
+        //        Console.WriteLine("Failed to get offset for symbol.");
+        //    }
+            
+        //    string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
+
+        //    asm += EvaluateExpressionASM(context.expression());
+
+        //    string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
+        //    if (context.DOLLAR() == null)
+        //    {
+        //        asm += $"mov [ebp{offsetValue}], eax\n";
+        //    }
+        //    else
+        //    {
+        //        asm += "lea edx, [ebp{offsetValue}] ; Move address of varaible's value into edx\n" +
+        //              $"mov [edx], eax ; mov right hand result into address in edx.\n";
+        //    }
+        //    return asm;
+        //}
 
         public string EvaluateExpressionASM([NotNull] gLangParser.ExpressionContext context)
         {

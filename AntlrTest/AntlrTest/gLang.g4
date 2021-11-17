@@ -30,7 +30,8 @@ statement
 	;
 
 variable_assignment
-	: SYMBOL_NAME COLON DATATYPE EQUALS expression
+	: SYMBOL_NAME COLON DATATYPE EQUALS expression #VaraibleDecl
+	| DOLLAR? SYMBOL_NAME EQUALS expression #VariableAssign
 	;
 
 function_call
