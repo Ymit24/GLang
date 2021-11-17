@@ -10,19 +10,49 @@ namespace AntlrTest
     {
         public enum ScopeType
         {
-            FUNCTION
+            FUNCTION,
+            PARAMETER
         }
 
-        public enum GDataType
+        public class ParameterScope : Scope
         {
-            I32, I16, I8
+            public ParameterScope() : base(ScopeType.PARAMETER, -8) { }
+
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                symbolTable.Add(symbolName, currentOffset);
+                int cacheOffset = currentOffset;
+
+                currentOffset -= Math.Min(4, GData.GetByteSize(type));
+
+                return cacheOffset;
+            }
         }
 
-        public class Scope
+        public class FunctionScope : Scope
+        {
+            public FunctionScope() : base(ScopeType.FUNCTION, 4) { }
+
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                symbolTable.Add(symbolName, currentOffset);
+                int cacheOffset = currentOffset;
+
+                currentOffset += Math.Min(4, GData.GetByteSize(type));
+
+                return cacheOffset;
+            }
+        }
+
+        public abstract class Scope
         {
             public readonly ScopeType Type;
-            private Dictionary<string, int> symbolTable = new Dictionary<string, int>();
-            private int currentOffset;
+            protected Dictionary<string, int> symbolTable = new Dictionary<string, int>();
+            protected int currentOffset;
 
             public int CurrentSize
             {
@@ -32,29 +62,13 @@ namespace AntlrTest
                 }
             }
 
-            public Scope(ScopeType type, int startingOffset = 4)
+            public Scope(ScopeType type, int startingOffset)
             {
                 Type = type;
                 currentOffset = startingOffset;
             }
 
-            public int IncludeSymbol(string symbolName, GDataType type)
-            {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
-
-                symbolTable.Add(symbolName, currentOffset);
-                int cacheOffset = currentOffset;
-
-                switch (type)
-                {
-                    case GDataType.I8: { currentOffset += 2; break; }
-                    case GDataType.I16: { currentOffset += 2; break; }
-                    case GDataType.I32: { currentOffset += 4; break; }
-                    default: { currentOffset += 4; break; }
-                }
-
-                return cacheOffset;
-            }
+            public abstract int IncludeSymbol(string symbolName, GDataType type);
 
             public int GetSymbolOffset(string symbolName)
             {
@@ -65,8 +79,18 @@ namespace AntlrTest
 
         private static Stack<Scope> VariableScope = new Stack<Scope>();
 
+        public static void PushParameterScope()
+        {
+            VariableScope.Push(new ParameterScope());
+        }
+
+        public static void PopParameterScope()
+        {
+            VariableScope.Pop();
+        }
+
         public static void PushFunctionScope() {
-            VariableScope.Push(new Scope(ScopeType.FUNCTION));
+            VariableScope.Push(new FunctionScope());
         }
 
         public static void PopFunctionScope() {
@@ -80,7 +104,14 @@ namespace AntlrTest
 
         public static int GetSymbolOffset(string symbolName)
         {
-            return VariableScope.Peek().GetSymbolOffset(symbolName);
+            Scope[] scopes = VariableScope.ToArray();
+
+            for (int i = scopes.Length - 1; i >= 0; i--)
+            {
+                int offset = scopes[i].GetSymbolOffset(symbolName);
+                if (offset != -1) return offset;
+            }
+            return -1;
         }
 
         public static int GetFunctionScopeSize()

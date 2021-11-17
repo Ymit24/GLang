@@ -8,7 +8,15 @@ header_statement
 	;
 
 function_declaration
-	: HASH SYMBOL_NAME COLON statement_block
+	: HASH SYMBOL_NAME COLON function_parameter_decl? (COMMA function_parameter_decl)* function_return_type? COLON? statement_block
+	;
+
+function_parameter_decl
+	: LPAREN SYMBOL_NAME COLON DATATYPE RPAREN
+	;
+
+function_return_type
+	: ARROW DATATYPE
 	;
 
 statement_block
@@ -32,7 +40,7 @@ function_call
 function_arguments
 	: expression (COMMA expression)*;
 
-return_stmt	: RETURN ;
+return_stmt	: RETURN expression?;
 
 expression
 	: MINUS expression #NegateExpr
@@ -60,6 +68,8 @@ COMMA : ',';
 
 DATATYPE : ('i') ('8' | '16' | '32') ;
 SYMBOL_NAME : (LOWERCASE | UPPERCASE) (LOWERCASE | UPPERCASE | [0-9] | '_')*;
+
+ARROW : '->';
 
 HASH : '#';
 COLON : ':';

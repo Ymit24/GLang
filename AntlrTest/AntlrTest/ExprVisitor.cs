@@ -98,6 +98,36 @@ namespace AntlrTest
         }
     }
 
+    class FunctionCallExprNode : ExprNode
+    {
+        public string functionName;
+        public ExprNode[] arguments;
+        public FunctionCallExprNode(string functionName, ExprNode[] arguments)
+            : base (ExprNodeType.FUNCTION_CALL)
+        {
+            this.functionName = functionName;
+            this.arguments = arguments;
+        }
+        
+        public override void Evaluate()
+        {
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "";
+            foreach (ExprNode arg in arguments.Reverse())
+            {
+                asm += ExprEvaluator.EvaluateExpressionTree(arg);
+            }
+            asm += $"call {functionName}\n" +
+                   $"add esp, {arguments.Length * 4}\n" + // TODO: REMOVE HARDCODE ARG SIZE
+                   $"push eax\n";
+            return asm;
+        }
+    }
+
     class SymbolLiteralExprNode : ExprNode
     {
         public string symbol;
@@ -115,7 +145,8 @@ namespace AntlrTest
                 Console.WriteLine("failed to find offset for symbol: " + symbol);
                 return "push DWORD 0\n";
             }
-            return $"push DWORD [ebp-{offset}] ; Push {symbol}\n"; // TODO: respect datasize.
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
+            return $"push DWORD [ebp{offsetValue}] ; Push {symbol}\n"; // TODO: respect datasize.
         }
     }
 
@@ -139,6 +170,23 @@ namespace AntlrTest
         
         public override ExprNode VisitSymbolLiteral([NotNull] gLangParser.SymbolLiteralContext context)
             { return new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText()); }
+
+        public override ExprNode VisitFuncCallExpr([NotNull] gLangParser.FuncCallExprContext context)
+        {
+            var args = context.function_call().function_arguments().expression();
+            if (args.Length == 0)
+                return new FunctionCallExprNode(context.function_call().SYMBOL_NAME().GetText(), new ExprNode[] { });
+
+            List<ExprNode> exprArgs = new List<ExprNode>();
+            foreach (var arg in args)
+            {
+                exprArgs.Add(Visit(arg));
+            }
+            return new FunctionCallExprNode(
+                context.function_call().SYMBOL_NAME().GetText(),
+                exprArgs.ToArray()
+            );
+        }
     }
 
     class ExprEvaluator
