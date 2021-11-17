@@ -128,6 +128,44 @@ namespace AntlrTest
         }
     }
 
+    class DefrefExpr : ExprNode
+    {
+        public ExprNode operand;
+        public DefrefExpr(ExprNode operand) : base(ExprNodeType.LITERAL) { this.operand = operand; }
+        public override void Evaluate()
+        {
+            operand.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+        public override string GenerateASM()
+        {
+            // TODO: Dont hardcode arg size.
+            return "pop eax\npush DWORD [eax]; push value at address in eax\n";
+        }
+    }
+
+    class RefExpr : ExprNode
+    {
+        public string symbol;
+        public RefExpr(string symbol) : base(ExprNodeType.LITERAL) { this.symbol = symbol; }
+        public override void Evaluate()
+        {
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+        public override string GenerateASM()
+        {
+            int offset = ScopeStack.GetSymbolOffset(symbol);
+            if (offset == -1)
+            {
+                Console.WriteLine("failed to find offset for symbol: " + symbol);
+                return "push DWORD 0\n";
+            }
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
+
+            return $"lea eax, [ebp{offsetValue}]; Get address of {symbol}\npush eax; push address onto stack\n";
+        }
+    }
+
     class SymbolLiteralExprNode : ExprNode
     {
         public string symbol;
@@ -186,6 +224,23 @@ namespace AntlrTest
                 context.function_call().SYMBOL_NAME().GetText(),
                 exprArgs.ToArray()
             );
+        }
+
+        public override ExprNode VisitDefrefExpr([NotNull] gLangParser.DefrefExprContext context)
+        {
+            return new DefrefExpr(Visit(context.expression()));
+        }
+
+        public override ExprNode VisitDefrefSymbolLiteral([NotNull] gLangParser.DefrefSymbolLiteralContext context)
+        {
+            return new DefrefExpr(
+                new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())
+            );
+        }
+
+        public override ExprNode VisitRefLiteral([NotNull] gLangParser.RefLiteralContext context)
+        {
+            return new RefExpr(context.SYMBOL_NAME().GetText());
         }
     }
 

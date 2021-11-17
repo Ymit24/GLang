@@ -50,6 +50,9 @@ expression
 	| expression MINUS expression #SubExpr
 	| LPAREN expression RPAREN #ParenExpr
 	| function_call #FuncCallExpr
+	| DOLLAR LPAREN expression RPAREN #DefrefExpr
+	| DOLLAR SYMBOL_NAME #DefrefSymbolLiteral
+	| AT SYMBOL_NAME #RefLiteral
 	| NUMBER #NumberLiteral
 	| SYMBOL_NAME #SymbolLiteral
 	| STRING #StringLiteral
@@ -66,7 +69,7 @@ RETURN : 'ret';
 
 COMMA : ',';
 
-DATATYPE : ('i') ('8' | '16' | '32') ;
+DATATYPE : ('i') ('8' | '16' | '32') ASTERIK?;
 SYMBOL_NAME : (LOWERCASE | UPPERCASE) (LOWERCASE | UPPERCASE | [0-9] | '_')*;
 
 ARROW : '->';
@@ -78,6 +81,8 @@ PLUS : '+';
 MINUS : '-';
 ASTERIK : '*';
 FSLASH : '/';
+DOLLAR : '$';
+AT : '@';
 
 LEFT_BRACKET : '[';
 RIGHT_BRACKET: ']';
