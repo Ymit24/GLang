@@ -31,7 +31,9 @@ statement
 
 variable_assignment
 	: SYMBOL_NAME COLON DATATYPE EQUALS expression #VaraibleDecl
-	| DOLLAR? SYMBOL_NAME EQUALS expression #VariableAssign
+	| SYMBOL_NAME EQUALS expression #VaraibleStdAssign
+	| DOLLAR SYMBOL_NAME EQUALS expression #VariableDerefAssign
+	| DOLLAR LPAREN expression RPAREN EQUALS expression #VariableDerefExprAssign
 	;
 
 function_call

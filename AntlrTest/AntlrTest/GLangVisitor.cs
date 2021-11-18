@@ -142,7 +142,7 @@ namespace AntlrTest
             return asm;
         }
 
-        public override string VisitVariableAssign([NotNull] gLangParser.VariableAssignContext context)
+        public override string VisitVaraibleStdAssign([NotNull] gLangParser.VaraibleStdAssignContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
 
@@ -152,23 +152,64 @@ namespace AntlrTest
                 Console.WriteLine("Failed to get offset for symbol.");
             }
 
-            string asm = $"\n;variable {(context.DOLLAR()==null ? "" : "$")}{symbolName}={context.expression().GetText()}\n";
+            string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
 
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
             asm += EvaluateExpressionASM(context.expression());
+            asm += $"mov [ebp{offsetValue}], eax\n";
+
+            return asm;
+        }
+
+        public override string VisitVariableDerefAssign([NotNull] gLangParser.VariableDerefAssignContext context)
+        {
+            string symbolName = context.SYMBOL_NAME().GetText();
+
+            int offset = ScopeStack.GetSymbolOffset(symbolName);
+            if (offset == -1)
+            {
+                Console.WriteLine("Failed to get offset for symbol.");
+            }
+
+            string asm = $"\n;variable {(context.DOLLAR() == null ? "" : "$")}{symbolName}={context.expression().GetText()}\n";
 
             string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
             if (context.DOLLAR() == null)
             {
+                asm += EvaluateExpressionASM(context.expression());
                 asm += $"mov [ebp{offsetValue}], eax\n";
             }
             else
             {
+                asm += EvaluateExpressionASM(context.expression());
                 asm += $"lea edx, [ebp{offsetValue}] ; Move address of pointer varaible into edx\n" +
                        $"mov edx, [edx] ; Deref the pointer into edx\n" +
                        $"mov [edx], eax ; mov right hand result into address in edx.\n";
             }
             return asm;
         }
+
+        public override string VisitVariableDerefExprAssign([NotNull] gLangParser.VariableDerefExprAssignContext context)
+        {
+            string asm = ";variable defref expr\n";
+
+            ExprVisitor lhs_visitor = new ExprVisitor();
+            ExprNode lhs_root = lhs_visitor.Visit(context.expression(0));
+            string lhs_asm = ExprEvaluator.EvaluateExpressionTree(lhs_root);
+
+            ExprVisitor rhs_visitor = new ExprVisitor();
+            ExprNode rhs_root = rhs_visitor.Visit(context.expression(1));
+            string rhs_asm = ExprEvaluator.EvaluateExpressionTree(rhs_root);
+
+            asm += rhs_asm; // stack will contain value to write
+            asm += lhs_asm; // stack will contain address to write to
+
+            asm += $"pop edx ; store address in edx\n" +
+                   $";mov edx, [edx] ; deref address\n" +
+                   $"pop DWORD [edx] ; write value into memory\n";
+            return asm;
+        }
+
         //public override string VisitVariable_assignment([NotNull] gLangParser.Variable_assignmentContext context)
         //{
         //    string symbolName = context.SYMBOL_NAME().GetText();
