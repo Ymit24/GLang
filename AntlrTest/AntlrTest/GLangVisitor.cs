@@ -210,35 +210,127 @@ namespace AntlrTest
             return asm;
         }
 
-        //public override string VisitVariable_assignment([NotNull] gLangParser.Variable_assignmentContext context)
-        //{
-        //    string symbolName = context.SYMBOL_NAME().GetText();
-        //    string datatype = context.DATATYPE().GetText();
-        //    GDataType type = GetDataType(datatype);
+        #region temp_if_tracker
+        private int if_counter = 0;
+        #endregion
 
-        //    int offset = ScopeStack.IncludeSymbol(symbolName, type);
-        //    if (offset == -1)
-        //    {
-        //        Console.WriteLine("Failed to get offset for symbol.");
-        //    }
-            
-        //    string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
+        public override string VisitStatement_block([NotNull] gLangParser.Statement_blockContext context)
+        {
+            string asm = "";
+            foreach (var stmt in context.statement())
+            {
+                asm += Visit(stmt);
+            }
+            return asm;
+        }
 
-        //    asm += EvaluateExpressionASM(context.expression());
+        public override string VisitIf_statement([NotNull] gLangParser.If_statementContext context)
+        {
+            var if_condition = context.logical_expression();
+            var if_body = context.statement_block();
+            var elseifs = context.else_if();
+            var else_stmt = context.else_stmt();
 
-        //    string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
-        //    if (context.DOLLAR() == null)
-        //    {
-        //        asm += $"mov [ebp{offsetValue}], eax\n";
-        //    }
-        //    else
-        //    {
-        //        asm += "lea edx, [ebp{offsetValue}] ; Move address of varaible's value into edx\n" +
-        //              $"mov [edx], eax ; mov right hand result into address in edx.\n";
-        //    }
-        //    return asm;
-        //}
+            string asm = "; IF BLOCK\n";
 
+            int current_if_level = if_counter++; // if we encounter a nested if, we make sure it can have its own level space.
+
+            asm += EvaluateLogicalExpressionASM(if_condition);
+            asm += "pop eax\n ; eax now has result of condition (either 0 or 1)\n" +
+                   "test eax, 1\n ; check if condition was true or false\n";
+
+            string nextLabel = $".__endif_{current_if_level}";
+
+            if (elseifs.Length != 0)
+            {
+                nextLabel = $".__elseif_{current_if_level}_0";
+            }
+            else if (else_stmt != null)
+            {
+                nextLabel = $".__else_{current_if_level}";
+            }
+
+            asm += $"jz {nextLabel} ; jump to next label if condition is false\n";
+
+            asm += Visit(if_body); // push all of if-body code.
+            asm += $"jmp .__endif_{current_if_level}\n ; Jump out of if-block once completed.\n";
+
+            for (int i = 0; i < elseifs.Length; i++)
+            {
+                asm += $".__elseif_{current_if_level}_{i}:\n";
+                var condition = elseifs[i].logical_expression();
+                asm += EvaluateLogicalExpressionASM(condition);
+                asm += "pop eax\n ; eax now has result of condition (either 0 or 1)\n" +
+                       "test eax, 1\n ; check if condition was true or false\n";
+
+                nextLabel = $".__endif_{current_if_level}";
+                if (i != elseifs.Length - 1)
+                {
+                    nextLabel = $".__elseif_{current_if_level}_{i+1}";
+                }
+                else if (else_stmt != null)
+                {
+                    nextLabel = $".__else_{current_if_level}";
+                }
+
+                asm += $"jz {nextLabel} ; jump to next label if condition is false\n";
+                asm += Visit(elseifs[i].statement_block()); // push all of if-body code.
+                asm += $"jmp .__endif_{current_if_level}\n ; Jump out of if-block once completed.\n";
+            }
+
+            if (else_stmt != null)
+            {
+                asm += $".__else_{current_if_level}:\n";
+                asm += Visit(else_stmt.statement_block());
+            }
+
+            asm += $".__endif_{current_if_level}:\n";
+
+
+            /*
+             
+              ; evaluate condition
+              ; ....
+              pop eax
+              test eax, 1
+              jz .__else_0 ; if condition is false, jump to else
+              ; here is if_body
+              .__else_0  ; 0 is counter for current if
+              ; here is else_body
+              .__endif_0 ; 0 is counter for current if
+              ; whatever is after this if block goes here
+              ; 
+              ------ ELSE IF EXAMPLE
+
+            ; test main condition
+            pop eax
+            test eax, 1
+            jz .__elseif_0 ; condition was false, check next condition
+            ; if-body
+            jmp .__endif_0 ; exit if block because a body completed
+            .__elseif_0
+            ; ... check condition
+            pop eax
+            test eax, 1
+            jz .__else_0 ; condition was false, go to else
+            ; elseif_body
+            jmp .__endif_0 ; exit if block because a body completed
+            .__else_0
+            ; else-body
+            ; jmp not needed since the end of the else is sequential with endif label
+            .__endif_0
+             
+             */
+
+            return asm;
+        }
+
+        /// <summary>
+        /// This will add a "pop eax\n" line to the end of the expression assembly.
+        /// E.g. puts result of expression in EAX register.
+        /// </summary>
+        /// <param name="context">Expression context to evaluate</param>
+        /// <returns>Assembly to evaluate the expression</returns>
         public string EvaluateExpressionASM([NotNull] gLangParser.ExpressionContext context)
         {
             ExprVisitor visitor = new ExprVisitor();
@@ -246,6 +338,18 @@ namespace AntlrTest
             string asm = ExprEvaluator.EvaluateExpressionTree(root);
             asm += "pop eax\n";
             return asm;
+        }
+
+        /// <summary>
+        /// This will leave the result (either 0 or 1) at last position on stack.
+        /// </summary>
+        /// <param name="context">Logical Expression context to evaluate</param>
+        /// <returns>Assembly to evaluate the expression</returns>
+        public string EvaluateLogicalExpressionASM([NotNull] gLangParser.Logical_expressionContext context)
+        {
+            LogicExprVisitor visitor = new LogicExprVisitor();
+            ExprNode root = visitor.Visit(context);
+            return ExprEvaluator.EvaluateExpressionTree(root);
         }
 
         public override string VisitReturn_stmt([NotNull] gLangParser.Return_stmtContext context)

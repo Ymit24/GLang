@@ -26,7 +26,19 @@ statement_block
 statement
 	: function_call
 	| variable_assignment
+	| if_statement
 	| return_stmt
+	;
+
+if_statement
+	: IF LPAREN logical_expression RPAREN COLON statement_block else_if* else_stmt? END
+	;
+
+else_if
+	: ELSEIF LPAREN logical_expression RPAREN COLON statement_block
+	;
+else_stmt
+	: ELSE COLON statement_block
 	;
 
 variable_assignment
@@ -44,6 +56,14 @@ function_arguments
 	: expression (COMMA expression)*;
 
 return_stmt	: RETURN expression?;
+
+logical_expression
+	: logical_expression AND logical_expression #AndExpr
+	| logical_expression OR logical_expression #OrExpr
+	| logical_expression EQEQ logical_expression #EqEqExpr
+	| LPAREN logical_expression RPAREN #ParenLogicExpr
+	| expression #LogicExprLiteral
+	;
 
 expression
 	: MINUS expression #NegateExpr
@@ -69,6 +89,13 @@ fragment UPPERCASE : [A-Z] ;
 
 EXTERN : 'extern';
 RETURN : 'ret';
+IF     : 'if';
+ELSEIF : 'elseif';
+ELSE   : 'else';
+END    : 'end';
+
+AND    : '&&';
+OR     : '|';
 
 COMMA : ',';
 
@@ -76,6 +103,15 @@ DATATYPE : ('i') ('8' | '16' | '32') ASTERIK?;
 SYMBOL_NAME : (LOWERCASE | UPPERCASE) (LOWERCASE | UPPERCASE | [0-9] | '_')*;
 
 ARROW : '->';
+
+
+// Conditional operators
+LEQ : '<=';
+LSS : '<';
+GEQ : '>=';
+GTR : '>';
+EQEQ : '==';
+NEQ : '!=';
 
 HASH : '#';
 COLON : ':';

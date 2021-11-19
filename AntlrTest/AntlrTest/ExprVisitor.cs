@@ -16,7 +16,16 @@ namespace AntlrTest
         SUB,
         MUL,
         DIV,
-        NEG
+        NEG,
+
+        AND,
+        OR,
+        EQEQ,
+        LSS,
+        LEQ,
+        GTR,
+        GEQ,
+        NEQ
     }
     
     abstract class ExprNode
@@ -39,6 +48,7 @@ namespace AntlrTest
         }
     }
 
+    #region StdExprNodes
     class AddExprNode : BinExprNode
     {
         public AddExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.ADD, left, right) {}
@@ -186,6 +196,90 @@ namespace AntlrTest
             string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
             return $"push DWORD [ebp{offsetValue}] ; Push {symbol}\n"; // TODO: respect datasize.
         }
+    }
+    #endregion
+    #region LogicExprNodes
+    class EqEqExprNode : BinExprNode
+    {
+        public EqEqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.EQEQ, left, right) { }
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; == expression\n" +
+                         "pop edx\n" +
+                         "pop eax\n" +
+                         "cmp eax,edx\n" +
+                         "sete al\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class NeqExprNode : BinExprNode
+    {
+        public NeqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.NEQ, left, right) { }
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; == expression\n" +
+                         "pop eax\n" +
+                         "pop edx\n" +
+                         "cmp eax,edx\n" +
+                         "setz al\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class AndExprNode : BinExprNode
+    {
+        public AndExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.ADD, left, right) { }
+
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; AND expression\n" +
+                         "pop eax\n" +
+                         "pop edx\n" +
+                         "test eax, edx\n" +
+                         "setnz al ; make sure lhs & rhs == 1 (CONDITIONAL AND)\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    #endregion
+
+    class LogicExprVisitor : gLangBaseVisitor<ExprNode>
+    {
+        public override ExprNode VisitLogicExprLiteral([NotNull] gLangParser.LogicExprLiteralContext context)
+        {
+            ExprVisitor visitor = new ExprVisitor();
+            return visitor.Visit(context.expression());
+        }
+        public override ExprNode VisitParenLogicExpr([NotNull] gLangParser.ParenLogicExprContext context)
+        {
+            return Visit(context.logical_expression());
+        }
+        public override ExprNode VisitEqEqExpr([NotNull] gLangParser.EqEqExprContext context)
+            { return new EqEqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        public override ExprNode VisitAndExpr([NotNull] gLangParser.AndExprContext context)
+            { return new AndExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
     }
 
     class ExprVisitor : gLangBaseVisitor<ExprNode>
