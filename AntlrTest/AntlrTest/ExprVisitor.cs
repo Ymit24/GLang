@@ -232,11 +232,11 @@ namespace AntlrTest
 
         public override string GenerateASM()
         {
-            string asm = "; == expression\n" +
-                         "pop eax\n" +
+            string asm = "; != expression\n" +
                          "pop edx\n" +
+                         "pop eax\n" +
                          "cmp eax,edx\n" +
-                         "setz al\n" +
+                         "setne al\n" +
                          "push eax\n";
             return asm;
         }
@@ -255,10 +255,119 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             string asm = "; AND expression\n" +
-                         "pop eax\n" +
                          "pop edx\n" +
+                         "pop eax\n" +
                          "test eax, edx\n" +
                          "setnz al ; make sure lhs & rhs == 1 (CONDITIONAL AND)\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class OrExprNode : BinExprNode
+    {
+        public OrExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.OR, left, right) { }
+
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; OR expression\n" +
+                         "pop edx\n" +
+                         "pop eax\n" +
+                         "or eax, edx\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class LeqExprNode : BinExprNode
+    {
+        public LeqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.LEQ, left, right) { }
+
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; LEQ expression\n" +
+                         "pop edx\n" +
+                         "pop eax\n" +
+                         "cmp eax,edx\n" +
+                         "setle al\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class LssExprNode : BinExprNode
+    {
+        public LssExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.LSS, left, right) { }
+
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; LSS expression\n" +
+                         "pop edx\n" +
+                         "pop eax\n" +
+                         "cmp eax,edx\n" +
+                         "setl al\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class GeqExprNode : BinExprNode
+    {
+        public GeqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.GEQ, left, right) { }
+
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; GEQ expression\n" +
+                         "pop edx\n" +
+                         "pop eax\n" +
+                         "cmp eax,edx\n" +
+                         "setge al\n" +
+                         "push eax\n";
+            return asm;
+        }
+    }
+    class GtrExprNode : BinExprNode
+    {
+        public GtrExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.GTR, left, right) { }
+
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string asm = "; GTR expression\n" +
+                         "pop edx\n" +
+                         "pop eax\n" +
+                         "cmp eax,edx\n" +
+                         "setg al\n" +
                          "push eax\n";
             return asm;
         }
@@ -278,8 +387,21 @@ namespace AntlrTest
         }
         public override ExprNode VisitEqEqExpr([NotNull] gLangParser.EqEqExprContext context)
             { return new EqEqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        public override ExprNode VisitNeqExpr([NotNull] gLangParser.NeqExprContext context)
+            { return new NeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitAndExpr([NotNull] gLangParser.AndExprContext context)
             { return new AndExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        public override ExprNode VisitOrExpr([NotNull] gLangParser.OrExprContext context)
+            { return new OrExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+
+        public override ExprNode VisitLEQExpr([NotNull] gLangParser.LEQExprContext context)
+            { return new LeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        public override ExprNode VisitLSSExpr([NotNull] gLangParser.LSSExprContext context)
+            { return new LssExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        public override ExprNode VisitGEQExpr([NotNull] gLangParser.GEQExprContext context)
+            { return new GeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        public override ExprNode VisitGTRExpr([NotNull] gLangParser.GTRExprContext context)
+            { return new GtrExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
     }
 
     class ExprVisitor : gLangBaseVisitor<ExprNode>

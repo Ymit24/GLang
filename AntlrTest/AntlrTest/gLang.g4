@@ -60,7 +60,12 @@ return_stmt	: RETURN expression?;
 logical_expression
 	: logical_expression AND logical_expression #AndExpr
 	| logical_expression OR logical_expression #OrExpr
+	| logical_expression LEQ logical_expression #LEQExpr
+	| logical_expression LSS logical_expression #LSSExpr
+	| logical_expression GEQ logical_expression #GEQExpr
+	| logical_expression GTR logical_expression #GTRExpr
 	| logical_expression EQEQ logical_expression #EqEqExpr
+	| logical_expression NEQ logical_expression #NeqExpr
 	| LPAREN logical_expression RPAREN #ParenLogicExpr
 	| expression #LogicExprLiteral
 	;
