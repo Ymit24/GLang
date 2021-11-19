@@ -210,10 +210,6 @@ namespace AntlrTest
             return asm;
         }
 
-        #region temp_if_tracker
-        private int if_counter = 0;
-        #endregion
-
         public override string VisitStatement_block([NotNull] gLangParser.Statement_blockContext context)
         {
             string asm = "";
@@ -223,6 +219,10 @@ namespace AntlrTest
             }
             return asm;
         }
+
+        #region temp_if_tracker
+        private int if_counter = 0;
+        #endregion
 
         public override string VisitIf_statement([NotNull] gLangParser.If_statementContext context)
         {
@@ -252,7 +252,18 @@ namespace AntlrTest
 
             asm += $"jz {nextLabel} ; jump to next label if condition is false\n";
 
-            asm += Visit(if_body); // push all of if-body code.
+            ScopeStack.PushIfScope();
+            string body_asm = Visit(if_body); // push all of if-body code.
+            int localSize = ScopeStack.GetCurrentScopeSize();
+            if (localSize != 0) {
+                asm += $"sub esp, {localSize} ; make room for block locals\n";
+            }
+            asm += body_asm;
+            ScopeStack.PopIfScope();
+            if (localSize != 0)
+            {
+                asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
+            }
             asm += $"jmp .__endif_{current_if_level}\n ; Jump out of if-block once completed.\n";
 
             for (int i = 0; i < elseifs.Length; i++)
@@ -274,54 +285,44 @@ namespace AntlrTest
                 }
 
                 asm += $"jz {nextLabel} ; jump to next label if condition is false\n";
-                asm += Visit(elseifs[i].statement_block()); // push all of if-body code.
+
+                ScopeStack.PushIfScope();
+                body_asm = Visit(elseifs[i].statement_block()); // push all of if-body code.
+                localSize = ScopeStack.GetCurrentScopeSize();
+                if (localSize != 0)
+                {
+                    asm += $"sub esp, {localSize} ; make room for block locals\n";
+                }
+                asm += body_asm;
+                ScopeStack.PopIfScope();
+                if (localSize != 0)
+                {
+                    asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
+                }
+
                 asm += $"jmp .__endif_{current_if_level}\n ; Jump out of if-block once completed.\n";
             }
 
             if (else_stmt != null)
             {
                 asm += $".__else_{current_if_level}:\n";
-                asm += Visit(else_stmt.statement_block());
+
+                ScopeStack.PushIfScope();
+                body_asm = Visit(else_stmt.statement_block()); // push all of if-body code.
+                localSize = ScopeStack.GetCurrentScopeSize();
+                if (localSize != 0)
+                {
+                    asm += $"sub esp, {localSize} ; make room for block locals\n";
+                }
+                asm += body_asm;
+                ScopeStack.PopIfScope();
+                if (localSize != 0)
+                {
+                    asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
+                }
             }
 
             asm += $".__endif_{current_if_level}:\n";
-
-
-            /*
-             
-              ; evaluate condition
-              ; ....
-              pop eax
-              test eax, 1
-              jz .__else_0 ; if condition is false, jump to else
-              ; here is if_body
-              .__else_0  ; 0 is counter for current if
-              ; here is else_body
-              .__endif_0 ; 0 is counter for current if
-              ; whatever is after this if block goes here
-              ; 
-              ------ ELSE IF EXAMPLE
-
-            ; test main condition
-            pop eax
-            test eax, 1
-            jz .__elseif_0 ; condition was false, check next condition
-            ; if-body
-            jmp .__endif_0 ; exit if block because a body completed
-            .__elseif_0
-            ; ... check condition
-            pop eax
-            test eax, 1
-            jz .__else_0 ; condition was false, go to else
-            ; elseif_body
-            jmp .__endif_0 ; exit if block because a body completed
-            .__else_0
-            ; else-body
-            ; jmp not needed since the end of the else is sequential with endif label
-            .__endif_0
-             
-             */
-
             return asm;
         }
 

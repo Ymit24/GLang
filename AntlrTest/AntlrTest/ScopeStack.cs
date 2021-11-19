@@ -11,7 +11,10 @@ namespace AntlrTest
         public enum ScopeType
         {
             FUNCTION,
-            PARAMETER
+            PARAMETER,
+            IF,
+            FOR,
+            WHILE
         }
 
         public class ParameterScope : Scope
@@ -25,7 +28,7 @@ namespace AntlrTest
                 symbolTable.Add(symbolName, currentOffset);
                 int cacheOffset = currentOffset;
 
-                currentOffset -= Math.Min(4, GData.GetByteSize(type));
+                currentOffset -= Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
 
                 return cacheOffset;
             }
@@ -42,7 +45,23 @@ namespace AntlrTest
                 symbolTable.Add(symbolName, currentOffset);
                 int cacheOffset = currentOffset;
 
-                currentOffset += Math.Min(4, GData.GetByteSize(type));
+                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
+
+                return cacheOffset;
+            }
+        }
+
+        public class IfScope : Scope
+        {
+            public IfScope(int startingOffset) : base(ScopeType.IF, startingOffset) { }
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                symbolTable.Add(symbolName, currentOffset);
+                int cacheOffset = currentOffset;
+
+                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
 
                 return cacheOffset;
             }
@@ -86,6 +105,10 @@ namespace AntlrTest
 
         public static void PopParameterScope()
         {
+            if (!(VariableScope.Peek() is ParameterScope))
+            {
+                throw new Exception("Tried to pop Parameter scope when next scope up was not Parameter.");
+            }
             VariableScope.Pop();
         }
 
@@ -93,7 +116,27 @@ namespace AntlrTest
             VariableScope.Push(new FunctionScope());
         }
 
-        public static void PopFunctionScope() {
+        public static void PopFunctionScope()
+        {
+            if (!(VariableScope.Peek() is FunctionScope))
+            {
+                throw new Exception("Tried to pop function scope when next scope up was not function.");
+            }
+            VariableScope.Pop();
+        }
+
+        public static void PushIfScope()
+        {
+            int size = GetCurrentScopeSize();
+            VariableScope.Push(new IfScope(size));
+        }
+
+        public static void PopIfScope()
+        {
+            if (!(VariableScope.Peek() is IfScope))
+            {
+                throw new Exception("Tried to pop if scope when next scope up was not If.");
+            }
             VariableScope.Pop();
         }
 
@@ -112,6 +155,12 @@ namespace AntlrTest
                 if (offset != -1) return offset;
             }
             return -1;
+        }
+
+        public static int GetCurrentScopeSize()
+        {
+            int upperScope = VariableScope.Count > 2 ? VariableScope.ElementAt(VariableScope.Count - 2).CurrentSize : 0;
+            return VariableScope.Peek().CurrentSize - upperScope;
         }
 
         public static int GetFunctionScopeSize()
