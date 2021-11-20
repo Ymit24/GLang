@@ -96,6 +96,9 @@ expression
 	| STRING #StringLiteral
 	;
 
+LINE_COMMENT
+   : '//' ~[\r\n]* (EOF | '\r'? '\n') -> skip
+   ;
 WS : (' '|'\t'|'\r'|'\n')+ -> skip;
 BLOCKCOMMENT : '/*' .*? '*/' -> skip;
 
