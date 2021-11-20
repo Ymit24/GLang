@@ -27,7 +27,17 @@ statement
 	: function_call
 	| variable_assignment
 	| if_statement
+	| while_statement
+	| break_stmt
 	| return_stmt
+	;
+
+while_statement
+	: WHILE LPAREN logical_expression RPAREN COLON statement_block END
+	;
+
+break_stmt
+	: BREAK
 	;
 
 if_statement
@@ -97,7 +107,9 @@ RETURN : 'ret';
 IF     : 'if';
 ELSEIF : 'elseif';
 ELSE   : 'else';
+WHILE  : 'while';
 END    : 'end';
+BREAK  : 'break';
 
 AND    : '&&';
 OR     : '|';

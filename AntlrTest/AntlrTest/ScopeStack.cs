@@ -67,13 +67,30 @@ namespace AntlrTest
             }
         }
 
+        public class WhileScope : Scope
+        {
+            public WhileScope(int startingOffset) : base(ScopeType.WHILE, startingOffset) { }
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                symbolTable.Add(symbolName, currentOffset);
+                int cacheOffset = currentOffset;
+
+                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
+
+                return cacheOffset;
+            }
+        }
+
         public abstract class Scope
         {
             public readonly ScopeType Type;
             protected Dictionary<string, int> symbolTable = new Dictionary<string, int>();
+            protected int startingOffset;
             protected int currentOffset;
 
-            public int CurrentSize
+            public int CurrentOffset
             {
                 get
                 {
@@ -81,9 +98,18 @@ namespace AntlrTest
                 }
             }
 
+            public int LocalSize
+            {
+                get
+                {
+                    return currentOffset - startingOffset;
+                }
+            }
+
             public Scope(ScopeType type, int startingOffset)
             {
                 Type = type;
+                this.startingOffset = startingOffset;
                 currentOffset = startingOffset;
             }
 
@@ -127,7 +153,7 @@ namespace AntlrTest
 
         public static void PushIfScope()
         {
-            int size = GetCurrentScopeSize();
+            int size = VariableScope.Peek().CurrentOffset;
             VariableScope.Push(new IfScope(size));
         }
 
@@ -136,6 +162,21 @@ namespace AntlrTest
             if (!(VariableScope.Peek() is IfScope))
             {
                 throw new Exception("Tried to pop if scope when next scope up was not If.");
+            }
+            VariableScope.Pop();
+        }
+
+        public static void PushWhileScope()
+        {
+            int size = VariableScope.Peek().CurrentOffset;
+            VariableScope.Push(new WhileScope(size));
+        }
+
+        public static void PopWhileScope()
+        {
+            if (!(VariableScope.Peek() is WhileScope))
+            {
+                throw new Exception("Tried to pop while scope when next scope up was not If.");
             }
             VariableScope.Pop();
         }
@@ -159,8 +200,12 @@ namespace AntlrTest
 
         public static int GetCurrentScopeSize()
         {
-            int upperScope = VariableScope.Count > 2 ? VariableScope.ElementAt(VariableScope.Count - 2).CurrentSize : 0;
-            return VariableScope.Peek().CurrentSize - upperScope;
+            //int size = 0;
+            //for (int i = 0; i < VariableScope.Count - 1; i++)
+            //{
+            //    size += VariableScope.ElementAt(i).CurrentSize;
+            //}
+            return VariableScope.Peek().LocalSize;
         }
 
         public static int GetFunctionScopeSize()
@@ -171,7 +216,7 @@ namespace AntlrTest
             {
                 if (scopes[i].Type == ScopeType.FUNCTION)
                 {
-                    return scopes[i].CurrentSize;
+                    return scopes[i].CurrentOffset;
                 }
             }
             return -1;

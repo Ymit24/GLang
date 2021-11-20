@@ -9,6 +9,12 @@ namespace AntlrTest
 {
     class GLangVisitor : gLangBaseVisitor<string>
     {
+        #region trackers
+        private int ifCounter = 0;
+        private int whileCounter = 0;
+        private Stack<string> breakLabels = new Stack<string>();
+        #endregion
+
         public override string VisitProgram([NotNull] gLangParser.ProgramContext context)
         {
             var headers = context.header_statement();
@@ -220,10 +226,6 @@ namespace AntlrTest
             return asm;
         }
 
-        #region temp_if_tracker
-        private int if_counter = 0;
-        #endregion
-
         public override string VisitIf_statement([NotNull] gLangParser.If_statementContext context)
         {
             var if_condition = context.logical_expression();
@@ -233,11 +235,11 @@ namespace AntlrTest
 
             string asm = "; IF BLOCK\n";
 
-            int current_if_level = if_counter++; // if we encounter a nested if, we make sure it can have its own level space.
+            int current_if_level = ifCounter++; // if we encounter a nested if, we make sure it can have its own level space.
 
             asm += EvaluateLogicalExpressionASM(if_condition);
             asm += "pop eax\n ; eax now has result of condition (either 0 or 1)\n" +
-                   "test eax, 1\n ; check if condition was true or false\n";
+                   "test eax, 1\n ; check if condition was true or false\n"; // TODO: Change conditional requirement to 0 is false, non-zero is true
 
             string nextLabel = $".__endif_{current_if_level}";
 
@@ -255,12 +257,12 @@ namespace AntlrTest
             ScopeStack.PushIfScope();
             string body_asm = Visit(if_body); // push all of if-body code.
             int localSize = ScopeStack.GetCurrentScopeSize();
-            if (localSize != 0) {
+            if (localSize > 0) {
                 asm += $"sub esp, {localSize} ; make room for block locals\n";
             }
             asm += body_asm;
             ScopeStack.PopIfScope();
-            if (localSize != 0)
+            if (localSize > 0)
             {
                 asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
             }
@@ -289,13 +291,13 @@ namespace AntlrTest
                 ScopeStack.PushIfScope();
                 body_asm = Visit(elseifs[i].statement_block()); // push all of if-body code.
                 localSize = ScopeStack.GetCurrentScopeSize();
-                if (localSize != 0)
+                if (localSize > 0)
                 {
                     asm += $"sub esp, {localSize} ; make room for block locals\n";
                 }
                 asm += body_asm;
                 ScopeStack.PopIfScope();
-                if (localSize != 0)
+                if (localSize > 0)
                 {
                     asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
                 }
@@ -324,6 +326,48 @@ namespace AntlrTest
 
             asm += $".__endif_{current_if_level}:\n";
             return asm;
+        }
+
+        public override string VisitWhile_statement([NotNull] gLangParser.While_statementContext context)
+        {
+            int currentWhile = whileCounter;
+            whileCounter++;
+
+            string asm = $".__while_{currentWhile}:\n";
+
+            asm += EvaluateLogicalExpressionASM(context.logical_expression());
+            asm += "pop eax\n ; eax now has result of condition (either 0 or 1)\n" +
+                   "cmp eax, 0\n ; check if condition was true or false\n" +
+                   $"je .__whileend_{currentWhile}\n";
+
+            ScopeStack.PushWhileScope();
+            breakLabels.Push($".__whileend_{currentWhile}");
+            string body_asm = Visit(context.statement_block());
+            breakLabels.Pop();
+            int localSize = ScopeStack.GetCurrentScopeSize();
+            if (localSize != 0)
+            {
+                asm += $"sub esp, {localSize} ; make room for block locals\n";
+            }
+            asm += body_asm;
+            asm += $"jmp .__while_{currentWhile}\n";
+            ScopeStack.PopWhileScope();
+            if (localSize != 0)
+            {
+                asm += $"add esp, {localSize} ; restore stack pointer from locals in while_block\n";
+            }
+            asm += $".__whileend_{currentWhile}:\n";
+
+            return asm;
+        }
+
+        public override string VisitBreak_stmt([NotNull] gLangParser.Break_stmtContext context)
+        {
+            if (breakLabels.Count == 0)
+            {
+                throw new Exception("Trying to break while outside of breakable block.");
+            }
+            return $"jmp {breakLabels.Peek()} ; break\n";
         }
 
         /// <summary>
