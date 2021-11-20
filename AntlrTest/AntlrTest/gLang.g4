@@ -91,6 +91,10 @@ expression
 	| DOLLAR LPAREN expression RPAREN #DefrefExpr
 	| DOLLAR SYMBOL_NAME #DefrefSymbolLiteral
 	| AT SYMBOL_NAME #RefLiteral
+	| SYMBOL_NAME PLUS PLUS #PostIncrementLiteral
+	| SYMBOL_NAME MINUS MINUS #PostDecrementLiteral
+	| PLUS PLUS SYMBOL_NAME #PreIncrementLiteral
+	| MINUS MINUS SYMBOL_NAME #PreDecrementLiteral
 	| NUMBER #NumberLiteral
 	| SYMBOL_NAME #SymbolLiteral
 	| STRING #StringLiteral

@@ -186,6 +186,22 @@ namespace AntlrTest
             return VariableScope.Peek().IncludeSymbol(symbolName, type);
         }
 
+        /// <summary>
+        /// Returns string like "[ebp-4]"
+        /// </summary>
+        /// <param name="symbolName">Symbol name to find offset for</param>
+        /// <returns>String offset for embedding into assembly generation.</returns>
+        public static string GetSymbolOffsetString(string symbolName)
+        {
+            int offset = GetSymbolOffset(symbolName);
+            if (offset == -1)
+            {
+                throw new Exception($"Failed to find offset for symbol \"{symbolName}\".");
+            }
+            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
+            return $"[ebp{offsetValue}]"; // TODO: respect datasize.
+        }
+
         public static int GetSymbolOffset(string symbolName)
         {
             Scope[] scopes = VariableScope.ToArray();

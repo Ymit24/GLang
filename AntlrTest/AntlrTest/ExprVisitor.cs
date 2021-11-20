@@ -18,6 +18,11 @@ namespace AntlrTest
         DIV,
         NEG,
 
+        PREFIX_INC,
+        PREFIX_DEC,
+        POSTFIX_INC,
+        POSTFIX_DEC,
+
         AND,
         OR,
         EQEQ,
@@ -94,6 +99,74 @@ namespace AntlrTest
         }
     }
 
+    class PostIncrementLiteral : ExprNode
+    {
+        public SymbolLiteralExprNode value;
+        public PostIncrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.POSTFIX_INC) { this.value = value; }
+        public override void Evaluate()
+        {
+            value.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            // TODO: RESPECT DATASIZE
+            return $"inc DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+    }
+
+    class PostDecrementLiteral : ExprNode
+    {
+        public SymbolLiteralExprNode value;
+        public PostDecrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.POSTFIX_DEC) { this.value = value; }
+        public override void Evaluate()
+        {
+            value.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            // TODO: RESPECT DATASIZE
+            return $"dec DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+    }
+
+    class PreIncrementLiteral : ExprNode
+    {
+        public SymbolLiteralExprNode value;
+        public PreIncrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.PREFIX_INC) { this.value = value; }
+        public override void Evaluate()
+        {
+            ExprEvaluator.currentExprStack.Add(this);
+            value.Evaluate();
+        }
+
+        public override string GenerateASM()
+        {
+            // TODO: RESPECT DATASIZE
+            return $"inc DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+    }
+
+    class PreDecrementLiteral : ExprNode
+    {
+        public SymbolLiteralExprNode value;
+        public PreDecrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.POSTFIX_DEC) { this.value = value; }
+        public override void Evaluate()
+        {
+            ExprEvaluator.currentExprStack.Add(this);
+            value.Evaluate();
+        }
+
+        public override string GenerateASM()
+        {
+            // TODO: RESPECT DATASIZE
+            return $"dec DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+    }
+
     class NumberExprNode : ExprNode
     {
         public int value;
@@ -167,8 +240,7 @@ namespace AntlrTest
             int offset = ScopeStack.GetSymbolOffset(symbol);
             if (offset == -1)
             {
-                Console.WriteLine("failed to find offset for symbol: " + symbol);
-                return "push DWORD 0\n";
+                throw new Exception("failed to find offset for symbol: " + symbol);
             }
             string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
 
@@ -186,15 +258,7 @@ namespace AntlrTest
         }
         public override string GenerateASM()
         {
-            // get offset for symbol
-            int offset = ScopeStack.GetSymbolOffset(symbol);
-            if (offset == -1)
-            {
-                Console.WriteLine("failed to find offset for symbol: " + symbol);
-                return "push DWORD 0\n";
-            }
-            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
-            return $"push DWORD [ebp{offsetValue}] ; Push {symbol}\n"; // TODO: respect datasize.
+            return $"push DWORD {ScopeStack.GetSymbolOffsetString(symbol)} ; Push {symbol}\n";
         }
     }
     #endregion
@@ -410,6 +474,16 @@ namespace AntlrTest
             { return new AddExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
         public override ExprNode VisitSubExpr([NotNull] gLangParser.SubExprContext context)
             { return new SubExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
+
+        public override ExprNode VisitPostIncrementLiteral([NotNull] gLangParser.PostIncrementLiteralContext context)
+            { return new PostIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        public override ExprNode VisitPostDecrementLiteral([NotNull] gLangParser.PostDecrementLiteralContext context)
+            { return new PostDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        public override ExprNode VisitPreIncrementLiteral([NotNull] gLangParser.PreIncrementLiteralContext context)
+            { return new PreIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        public override ExprNode VisitPreDecrementLiteral([NotNull] gLangParser.PreDecrementLiteralContext context)
+            { return new PreDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+
 
         public override ExprNode VisitParenExpr([NotNull] gLangParser.ParenExprContext context)
             { return Visit(context.expression()); }
