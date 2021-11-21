@@ -68,8 +68,12 @@ namespace AntlrTest
                 if (node is SymbolLiteralExprNode)
                 {
                     SymbolLiteralExprNode symbolNode = node as SymbolLiteralExprNode;
-                    GDataSymbol symbol = ScopeStack.GetSymbol(symbolNode.symbol);
+                    GDataSymbol symbol = ScopeStack.GetSymbol(symbolNode.symbolName);
                     if (symbol.Type.IsPointer)
+                    {
+                        type = symbol.Type;
+                    }
+                    else if (symbol.Type.IsArray)
                     {
                         type = symbol.Type;
                     }
@@ -78,6 +82,7 @@ namespace AntlrTest
 
             if (type == null)
             {
+                
                 throw new Exception("Could not determine type of expression.");
             }
 
@@ -170,7 +175,7 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"inc {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"inc {ScopeStack.GetSymbol(value.symbolName).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbolName)} ; Increment {value.symbolName}\n";
         }
 
         public override List<ExprNode> GetChildren()
@@ -192,7 +197,7 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"dec {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"dec {ScopeStack.GetSymbol(value.symbolName).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbolName)} ; Increment {value.symbolName}\n";
         }
 
         public override List<ExprNode> GetChildren()
@@ -214,7 +219,7 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"inc {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"inc {ScopeStack.GetSymbol(value.symbolName).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbolName)} ; Increment {value.symbolName}\n";
         }
 
         public override List<ExprNode> GetChildren()
@@ -236,7 +241,7 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"dec {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"dec {ScopeStack.GetSymbol(value.symbolName).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbolName)} ; Increment {value.symbolName}\n";
         }
 
         public override List<ExprNode> GetChildren()
@@ -381,7 +386,8 @@ namespace AntlrTest
             }
             string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
 
-            return $"lea eax, [ebp{offsetValue}]; Get address of {symbol}\npush eax; push address onto stack\n";
+            return $"lea eax, {ScopeStack.GetSymbolOffsetString(symbol)}; Get address of {symbol}\n" +
+                   $"push eax; push address onto stack\n";
         }
 
         public override List<ExprNode> GetChildren()
@@ -392,15 +398,20 @@ namespace AntlrTest
 
     public class SymbolLiteralExprNode : ExprNode
     {
-        public string symbol;
-        public SymbolLiteralExprNode(string symbol) : base(ExprNodeType.LITERAL) { this.symbol = symbol; }
+        public string symbolName;
+        public SymbolLiteralExprNode(string symbol) : base(ExprNodeType.LITERAL) { this.symbolName = symbol; }
         public override void Evaluate()
         {
             ExprEvaluator.currentExprStack.Add(this);
         }
         public override string GenerateASM()
         {
-            return $"push DWORD {ScopeStack.GetSymbolOffsetString(symbol)} ; Push {symbol}\n";
+            GDataSymbol symbol = ScopeStack.GetSymbol(symbolName);
+            if (symbol.Type.IsArray)
+            {
+                return new RefExpr(symbolName).GenerateASM();
+            }
+            return $"push DWORD {ScopeStack.GetSymbolOffsetString(symbolName)} ; Push {symbolName} value\n";
         }
 
         public override List<ExprNode> GetChildren()
