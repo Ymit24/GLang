@@ -20,7 +20,7 @@ namespace AntlrTest
         public abstract class Scope
         {
             public readonly ScopeType Type;
-            protected Dictionary<string, int> symbolTable = new Dictionary<string, int>();
+            protected Dictionary<string, GDataSymbol> symbolTable = new Dictionary<string, GDataSymbol>();
             protected int startingOffset;
             protected int currentOffset;
 
@@ -49,10 +49,20 @@ namespace AntlrTest
 
             public abstract int IncludeSymbol(string symbolName, GDataType type);
 
-            public int GetSymbolOffset(string symbolName)
+            public bool HasSymbol(string symbolName)
+            {
+                return symbolTable.ContainsKey(symbolName);
+            }
+
+            public GDataSymbol GetSymbol(string symbolName)
             {
                 if (symbolTable.ContainsKey(symbolName)) return symbolTable[symbolName];
-                return -1;
+                throw new Exception("Symbol not found.");
+            }
+
+            public int GetSymbolOffset(string symbolName)
+            {
+                return GetSymbol(symbolName).Offset;
             }
         }
 
@@ -70,7 +80,7 @@ namespace AntlrTest
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
 
-                symbolTable.Add(symbolName, currentOffset);
+                symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
                 int cacheOffset = currentOffset;
 
                 currentOffset += type.AlignedSize;
@@ -87,7 +97,7 @@ namespace AntlrTest
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
 
-                symbolTable.Add(symbolName, currentOffset);
+                symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
                 int cacheOffset = currentOffset;
 
                 currentOffset -= type.AlignedSize;
@@ -193,6 +203,8 @@ namespace AntlrTest
 
         public static int IncludeSymbol(string symbolName, GDataType type)
         {
+            if (VariableScope.Count == 0)
+                throw new Exception("Trying to include variable outside of any scopes.");
             return VariableScope.Peek().IncludeSymbol(symbolName, type);
         }
 
@@ -212,16 +224,22 @@ namespace AntlrTest
             return $"[ebp{offsetValue}]"; // TODO: respect datasize.
         }
 
+        public static GDataSymbol GetSymbol(string symbolName)
+        {
+            for (int i = 0; i < VariableScope.Count; i++)
+            {
+                Scope scope = VariableScope.ElementAt(i);
+                if (scope.HasSymbol(symbolName))
+                {
+                    return scope.GetSymbol(symbolName);
+                }
+            }
+            throw new Exception($"Could not find offset for symbol {symbolName}");
+        }
+
         public static int GetSymbolOffset(string symbolName)
         {
-            Scope[] scopes = VariableScope.ToArray();
-
-            for (int i = scopes.Length - 1; i >= 0; i--)
-            {
-                int offset = scopes[i].GetSymbolOffset(symbolName);
-                if (offset != -1) return offset;
-            }
-            return -1;
+            return GetSymbol(symbolName).Offset;
         }
 
         public static int GetCurrentLocalSize()

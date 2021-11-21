@@ -65,7 +65,7 @@ else_stmt
 	;
 
 variable_assignment
-	: SYMBOL_NAME COLON datatype EQUALS expression #VaraibleDecl
+	: SYMBOL_NAME COLON datatype EQUALS (expression | NULL_OP) #VaraibleDecl
 	| SYMBOL_NAME EQUALS expression #VaraibleStdAssign
 	| DOLLAR SYMBOL_NAME EQUALS expression #VariableDerefAssign
 	| DOLLAR LPAREN expression RPAREN EQUALS expression #VariableDerefExprAssign
@@ -115,7 +115,7 @@ expression
 	| STRING #StringLiteral
 	;
 
-datatype : SYMBOL_NAME ASTERIK?;
+datatype : SYMBOL_NAME (LPAREN NUMBER RPAREN)? ASTERIK?;
 
 LINE_COMMENT
    : '//' ~[\r\n]* (EOF | '\r'? '\n') -> skip
@@ -169,6 +169,7 @@ LEFT_BRACKET : '[';
 RIGHT_BRACKET: ']';
 LPAREN : '(';
 RPAREN : ')';
+NULL_OP : '_';
 
 STRING : '"' .*? '"';
 

@@ -111,20 +111,29 @@ namespace AntlrTest
         public override string VisitVaraibleDecl([NotNull] gLangParser.VaraibleDeclContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
-            string datatype = context.datatype().GetText();
-            
-            int offset = ScopeStack.IncludeSymbol(symbolName, new GDataType(datatype));
-            if (offset == -1)
+            var raw_datatype = context.datatype();
+            string datatypeString = raw_datatype.GetText();
+
+            GDataType datatype = null;
+            if (raw_datatype.NUMBER() != null)
             {
-                Console.WriteLine("Failed to get offset for symbol.");
+                datatype = new GDataType(datatypeString, int.Parse(raw_datatype.NUMBER().GetText()));
+            }
+            else
+            {
+                datatype = new GDataType(datatypeString);
             }
 
-            string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
+            ScopeStack.IncludeSymbol(symbolName, datatype);
 
-            asm += EvaluateExpressionASM(context.expression());
+            string asm = "";
 
-            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
-            asm += $"mov [ebp{offsetValue}], eax\n";
+            if (datatype.IsArray == false)
+            {
+                asm += $"\n;variable {symbolName}={context.expression().GetText()}\n";
+                asm += EvaluateExpressionASM(context.expression());
+                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {datatype.MemoryRegister}\n";
+            }
             return asm;
         }
 
@@ -132,9 +141,11 @@ namespace AntlrTest
         {
             string symbolName = context.SYMBOL_NAME().GetText();
 
+            GDataSymbol symbol = ScopeStack.GetSymbol(symbolName);
+
             string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
             asm += EvaluateExpressionASM(context.expression());
-            asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, eax\n";
+            asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {symbol.Type.MemoryRegister}\n";
             return asm;
         }
 
@@ -142,27 +153,15 @@ namespace AntlrTest
         {
             string symbolName = context.SYMBOL_NAME().GetText();
 
-            int offset = ScopeStack.GetSymbolOffset(symbolName);
-            if (offset == -1)
-            {
-                Console.WriteLine("Failed to get offset for symbol.");
-            }
+            GDataSymbol symbol = ScopeStack.GetSymbol(symbolName);
 
             string asm = $"\n;variable {(context.DOLLAR() == null ? "" : "$")}{symbolName}={context.expression().GetText()}\n";
 
-            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
-            if (context.DOLLAR() == null)
-            {
-                asm += EvaluateExpressionASM(context.expression());
-                asm += $"mov [ebp{offsetValue}], eax\n";
-            }
-            else
-            {
-                asm += EvaluateExpressionASM(context.expression());
-                asm += $"lea edx, [ebp{offsetValue}] ; Move address of pointer varaible into edx\n" +
-                       $"mov edx, [edx] ; Deref the pointer into edx\n" +
-                       $"mov [edx], eax ; mov right hand result into address in edx.\n";
-            }
+            asm += EvaluateExpressionASM(context.expression());
+            asm += $"lea edx, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Move address of pointer varaible into edx\n" +
+                   $"mov edx, [edx] ; Deref the pointer into edx\n" +
+                   $"mov [edx], {symbol.Type.UnderlyingDataType.MemoryRegister} ; mov right hand result into address in edx.\n";
+
             return asm;
         }
 
@@ -174,16 +173,24 @@ namespace AntlrTest
             ExprNode lhs_root = lhs_visitor.Visit(context.expression(0));
             string lhs_asm = ExprEvaluator.EvaluateExpressionTree(lhs_root);
 
+
+            GDataType type = lhs_root.EvaluateExpressionType();
+
+            int lhs_size = type.MemorySize;
+
             ExprVisitor rhs_visitor = new ExprVisitor();
             ExprNode rhs_root = rhs_visitor.Visit(context.expression(1));
             string rhs_asm = ExprEvaluator.EvaluateExpressionTree(rhs_root);
 
+            // TODO: Once we have floats, this changes things
+
             asm += rhs_asm; // stack will contain value to write
             asm += lhs_asm; // stack will contain address to write to
 
-            asm += $"pop edx ; store address in edx\n" +
-                   $";mov edx, [edx] ; deref address\n" +
-                   $"pop DWORD [edx] ; write value into memory\n";
+            asm += "pop edx ; Load address\n" +
+                   "pop eax ; Load value\n";
+
+            asm += $"mov [edx], {type.UnderlyingDataType.MemoryRegister} ; Type sensitive write\n";
             return asm;
         }
 

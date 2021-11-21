@@ -40,6 +40,43 @@ namespace AntlrTest
         protected ExprNode(ExprNodeType type) { this.type = type; }
         public abstract void Evaluate();
         public abstract string GenerateASM();
+        public abstract List<ExprNode> GetChildren();
+
+        public GDataType EvaluateExpressionType()
+        {
+            GDataType type = null;
+            List<ExprNode> children = GetChildren();
+            children.Add(this);
+
+            while (children.Count > 0)
+            {
+                ExprNode node = children[0];
+                children.RemoveAt(0);
+
+                if (node is RefExpr)
+                {
+                    string symbolName = (node as RefExpr).symbol;
+                    type = ScopeStack.GetSymbol(symbolName).Type;
+                    break;
+                }
+                if (node is SymbolLiteralExprNode)
+                {
+                    SymbolLiteralExprNode symbolNode = node as SymbolLiteralExprNode;
+                    GDataSymbol symbol = ScopeStack.GetSymbol(symbolNode.symbol);
+                    if (symbol.Type.IsPointer)
+                    {
+                        type = symbol.Type;
+                    }
+                }
+            }
+
+            if (type == null)
+            {
+                throw new Exception("Could not determine type of expression.");
+            }
+
+            return type;
+        }
     }
 
     public abstract class BinExprNode : ExprNode
@@ -50,6 +87,15 @@ namespace AntlrTest
         {
             this.left = left;
             this.right = right;
+        }
+        public override List<ExprNode> GetChildren()
+        {
+            List<ExprNode> children = new List<ExprNode>();
+            children.Add(left);
+            children.Add(right);
+            children.AddRange(left.GetChildren());
+            children.AddRange(right.GetChildren());
+            return children;
         }
     }
 
@@ -98,6 +144,11 @@ namespace AntlrTest
         {
             throw new NotImplementedException();
         }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { value };
+        }
     }
 
     public class PostIncrementLiteral : ExprNode
@@ -113,7 +164,12 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"inc DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"inc {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { value };
         }
     }
 
@@ -130,7 +186,12 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"dec DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"dec {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { value };
         }
     }
 
@@ -147,7 +208,12 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"inc DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"inc {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { value };
         }
     }
 
@@ -164,7 +230,12 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             // TODO: RESPECT DATASIZE
-            return $"dec DWORD {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+            return $"dec {ScopeStack.GetSymbol(value.symbol).Type.AsmType} {ScopeStack.GetSymbolOffsetString(value.symbol)} ; Increment {value.symbol}\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { value };
         }
     }
 
@@ -178,7 +249,12 @@ namespace AntlrTest
         }
         public override string GenerateASM()
         {
-            return $"push DWORD {value} ; Push {value}\n"; // TODO: MAKE THIS DATATYPE FRIENDLY?
+            return $"push DWORD {value} ; Push {value}\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { };
         }
     }
 
@@ -206,9 +282,14 @@ namespace AntlrTest
                 asm += ExprEvaluator.EvaluateExpressionTree(arg);
             }
             asm += $"call {functionName}\n" +
-                   $"add esp, {arguments.Length * 4}\n" + // TODO: REMOVE HARDCODE ARG SIZE
+                   $"add esp, {arguments.Length * 4}\n" +
                    $"push eax\n";
             return asm;
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -223,8 +304,28 @@ namespace AntlrTest
         }
         public override string GenerateASM()
         {
-            // TODO: Dont hardcode arg size.
-            return "pop eax\npush DWORD [eax]; push value at address in eax\n";
+            GDataType type = operand.EvaluateExpressionType();
+
+            string asmType = (type.IsPointer ? type.UnderlyingDataType.AsmType : type.AsmType);
+
+            string asm = "pop eax ; Load address\n";
+
+            if (asmType == "DWORD")
+            {
+                asm += "mov eax, [eax] ; Type sensitive Read\n";
+            }
+            else
+            {
+                asm += $"movzx eax, {asmType} [eax] ; Type sensitive Read\n";
+            }
+
+            asm += "push eax ; Push Value\n";
+            return asm;
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { operand };
         }
     }
 
@@ -247,6 +348,11 @@ namespace AntlrTest
 
             return $"lea eax, [ebp{offsetValue}]; Get address of {symbol}\npush eax; push address onto stack\n";
         }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { new SymbolLiteralExprNode(symbol) };
+        }
     }
 
     public class SymbolLiteralExprNode : ExprNode
@@ -260,6 +366,11 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             return $"push DWORD {ScopeStack.GetSymbolOffsetString(symbol)} ; Push {symbol}\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { };
         }
     }
 
@@ -277,6 +388,11 @@ namespace AntlrTest
         {
             string symbol = LiteralValueExtractorVisitor.StringLiteralHolder.GetStringSymbol(literal);
             return $"push {symbol} ; Push symbol for string literal\n";
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            return new List<ExprNode>() { };
         }
     }
     #endregion
