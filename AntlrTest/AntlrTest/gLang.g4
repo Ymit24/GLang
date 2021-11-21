@@ -28,6 +28,7 @@ statement
 	| variable_assignment
 	| if_statement
 	| while_statement
+	| for_statement
 	| break_stmt
 	| return_stmt
 	;
@@ -35,6 +36,13 @@ statement
 while_statement
 	: WHILE LPAREN logical_expression RPAREN COLON statement_block END
 	;
+
+for_statement
+	: FOR LPAREN for_initial? COMMA logical_expression? COMMA for_incrementor? RPAREN COLON statement_block END
+	;
+
+for_initial : variable_assignment;
+for_incrementor : variable_assignment;
 
 break_stmt
 	: BREAK
@@ -56,6 +64,8 @@ variable_assignment
 	| SYMBOL_NAME EQUALS expression #VaraibleStdAssign
 	| DOLLAR SYMBOL_NAME EQUALS expression #VariableDerefAssign
 	| DOLLAR LPAREN expression RPAREN EQUALS expression #VariableDerefExprAssign
+	| SYMBOL_NAME PLUS PLUS #VariableIncrementAssign
+	| SYMBOL_NAME MINUS MINUS #VariableDecrementAssign
 	;
 
 function_call
@@ -115,6 +125,7 @@ IF     : 'if';
 ELSEIF : 'elseif';
 ELSE   : 'else';
 WHILE  : 'while';
+FOR    : 'for';
 END    : 'end';
 BREAK  : 'break';
 

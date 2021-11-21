@@ -17,72 +17,6 @@ namespace AntlrTest
             WHILE
         }
 
-        public class ParameterScope : Scope
-        {
-            public ParameterScope() : base(ScopeType.PARAMETER, -8) { }
-
-            public override int IncludeSymbol(string symbolName, GDataType type)
-            {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
-
-                symbolTable.Add(symbolName, currentOffset);
-                int cacheOffset = currentOffset;
-
-                currentOffset -= Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
-
-                return cacheOffset;
-            }
-        }
-
-        public class FunctionScope : Scope
-        {
-            public FunctionScope() : base(ScopeType.FUNCTION, 4) { }
-
-            public override int IncludeSymbol(string symbolName, GDataType type)
-            {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
-
-                symbolTable.Add(symbolName, currentOffset);
-                int cacheOffset = currentOffset;
-
-                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
-
-                return cacheOffset;
-            }
-        }
-
-        public class IfScope : Scope
-        {
-            public IfScope(int startingOffset) : base(ScopeType.IF, startingOffset) { }
-            public override int IncludeSymbol(string symbolName, GDataType type)
-            {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
-
-                symbolTable.Add(symbolName, currentOffset);
-                int cacheOffset = currentOffset;
-
-                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
-
-                return cacheOffset;
-            }
-        }
-
-        public class WhileScope : Scope
-        {
-            public WhileScope(int startingOffset) : base(ScopeType.WHILE, startingOffset) { }
-            public override int IncludeSymbol(string symbolName, GDataType type)
-            {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
-
-                symbolTable.Add(symbolName, currentOffset);
-                int cacheOffset = currentOffset;
-
-                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
-
-                return cacheOffset;
-            }
-        }
-
         public abstract class Scope
         {
             public readonly ScopeType Type;
@@ -122,7 +56,65 @@ namespace AntlrTest
             }
         }
 
+        class IncrementingScope : Scope
+        {
+            public IncrementingScope(ScopeType type, int startingOffset) : base(type, startingOffset) { }
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                symbolTable.Add(symbolName, currentOffset);
+                int cacheOffset = currentOffset;
+
+                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
+
+                return cacheOffset;
+            }
+        }
+
+        // TODO: Replace scopes with just parameterized incrementing scopes.
+
+        class FunctionScope : IncrementingScope
+        {
+            public FunctionScope() : base(ScopeType.FUNCTION, 4) { }
+        }
+
+        class IfScope : IncrementingScope
+        {
+            public IfScope(int startingOffset) : base(ScopeType.IF, startingOffset) { }
+        }
+
+        class WhileScope : IncrementingScope
+        {
+            public WhileScope(int startingOffset) : base(ScopeType.WHILE, startingOffset) { }
+        }
+
+        class ForScope : IncrementingScope
+        {
+            public ForScope(int startingOffset) : base(ScopeType.FOR, startingOffset) { }
+        }
+
+
+        public class ParameterScope : Scope
+        {
+            public ParameterScope() : base(ScopeType.PARAMETER, -8) { }
+
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                symbolTable.Add(symbolName, currentOffset);
+                int cacheOffset = currentOffset;
+
+                currentOffset -= Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
+
+                return cacheOffset;
+            }
+        }
+
         private static Stack<Scope> VariableScope = new Stack<Scope>();
+
+        // TODO: REPLACE REDUNDANT PUSH/POP FUNCTIONS
 
         public static void PushParameterScope()
         {
@@ -133,7 +125,7 @@ namespace AntlrTest
         {
             if (!(VariableScope.Peek() is ParameterScope))
             {
-                throw new Exception("Tried to pop Parameter scope when next scope up was not Parameter.");
+                throw new Exception("Tried to pop Parameter scope when next scope up was not correct type.");
             }
             VariableScope.Pop();
         }
@@ -146,7 +138,7 @@ namespace AntlrTest
         {
             if (!(VariableScope.Peek() is FunctionScope))
             {
-                throw new Exception("Tried to pop function scope when next scope up was not function.");
+                throw new Exception("Tried to pop function scope when next scope up was not correct type.");
             }
             VariableScope.Pop();
         }
@@ -161,7 +153,7 @@ namespace AntlrTest
         {
             if (!(VariableScope.Peek() is IfScope))
             {
-                throw new Exception("Tried to pop if scope when next scope up was not If.");
+                throw new Exception("Tried to pop if scope when next scope up was not correct type.");
             }
             VariableScope.Pop();
         }
@@ -176,7 +168,22 @@ namespace AntlrTest
         {
             if (!(VariableScope.Peek() is WhileScope))
             {
-                throw new Exception("Tried to pop while scope when next scope up was not If.");
+                throw new Exception("Tried to pop while scope when next scope up was not correct type.");
+            }
+            VariableScope.Pop();
+        }
+
+        public static void PushForScope()
+        {
+            int size = VariableScope.Peek().CurrentOffset;
+            VariableScope.Push(new ForScope(size));
+        }
+
+        public static void PopForScope()
+        {
+            if (!(VariableScope.Peek() is ForScope))
+            {
+                throw new Exception("Tried to pop for scope when next scope up was not correct type.");
             }
             VariableScope.Pop();
         }
@@ -214,14 +221,22 @@ namespace AntlrTest
             return -1;
         }
 
-        public static int GetCurrentScopeSize()
+        public static int GetCurrentLocalSize()
         {
-            //int size = 0;
-            //for (int i = 0; i < VariableScope.Count - 1; i++)
-            //{
-            //    size += VariableScope.ElementAt(i).CurrentSize;
-            //}
             return VariableScope.Peek().LocalSize;
+        }
+
+        public static int GetLocalSizeUpTo(ScopeType type)
+        {
+            Scope[] scopes = VariableScope.ToArray();
+            int size = 0;
+
+            for (int i = scopes.Length - 1; i >= 0; i--)
+            {
+                size += scopes[i].LocalSize;
+                if (scopes[i].Type == type) return size;
+            }
+            throw new Exception("Could not find scope of type " + type);
         }
 
         public static int GetFunctionScopeSize()

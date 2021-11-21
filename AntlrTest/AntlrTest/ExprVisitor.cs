@@ -8,7 +8,7 @@ using Antlr4.Runtime.Misc;
 
 namespace AntlrTest
 {
-    enum ExprNodeType
+    public enum ExprNodeType
     {
         LITERAL,
         FUNCTION_CALL,
@@ -32,8 +32,8 @@ namespace AntlrTest
         GEQ,
         NEQ
     }
-    
-    abstract class ExprNode
+
+    public abstract class ExprNode
     {
         public ExprNodeType type;
 
@@ -42,7 +42,7 @@ namespace AntlrTest
         public abstract string GenerateASM();
     }
 
-    abstract class BinExprNode : ExprNode
+    public abstract class BinExprNode : ExprNode
     {
         public ExprNode left, right;
         protected BinExprNode(ExprNodeType type, ExprNode left, ExprNode right)
@@ -54,7 +54,7 @@ namespace AntlrTest
     }
 
     #region StdExprNodes
-    class AddExprNode : BinExprNode
+    public class AddExprNode : BinExprNode
     {
         public AddExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.ADD, left, right) {}
         public override void Evaluate()
@@ -68,7 +68,8 @@ namespace AntlrTest
             return $"pop edx ; Get Right\npop eax ; Get left\nadd eax, edx; Add\npush eax ; Push result\n";
         }
     }
-    class SubExprNode : BinExprNode
+
+    public class SubExprNode : BinExprNode
     {
         public SubExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.SUB, left, right) { }
         public override void Evaluate()
@@ -83,7 +84,7 @@ namespace AntlrTest
         }
     }
 
-    class NegateExprNode : ExprNode
+    public class NegateExprNode : ExprNode
     {
         public ExprNode value;
         public NegateExprNode(ExprNode value) : base(ExprNodeType.NEG) { this.value = value; }
@@ -99,7 +100,7 @@ namespace AntlrTest
         }
     }
 
-    class PostIncrementLiteral : ExprNode
+    public class PostIncrementLiteral : ExprNode
     {
         public SymbolLiteralExprNode value;
         public PostIncrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.POSTFIX_INC) { this.value = value; }
@@ -116,7 +117,7 @@ namespace AntlrTest
         }
     }
 
-    class PostDecrementLiteral : ExprNode
+    public class PostDecrementLiteral : ExprNode
     {
         public SymbolLiteralExprNode value;
         public PostDecrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.POSTFIX_DEC) { this.value = value; }
@@ -133,7 +134,7 @@ namespace AntlrTest
         }
     }
 
-    class PreIncrementLiteral : ExprNode
+    public class PreIncrementLiteral : ExprNode
     {
         public SymbolLiteralExprNode value;
         public PreIncrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.PREFIX_INC) { this.value = value; }
@@ -150,7 +151,7 @@ namespace AntlrTest
         }
     }
 
-    class PreDecrementLiteral : ExprNode
+    public class PreDecrementLiteral : ExprNode
     {
         public SymbolLiteralExprNode value;
         public PreDecrementLiteral(SymbolLiteralExprNode value) : base(ExprNodeType.POSTFIX_DEC) { this.value = value; }
@@ -167,7 +168,7 @@ namespace AntlrTest
         }
     }
 
-    class NumberExprNode : ExprNode
+    public class NumberExprNode : ExprNode
     {
         public int value;
         public NumberExprNode(int value) : base(ExprNodeType.LITERAL) { this.value = value; }
@@ -181,7 +182,7 @@ namespace AntlrTest
         }
     }
 
-    class FunctionCallExprNode : ExprNode
+    public class FunctionCallExprNode : ExprNode
     {
         public string functionName;
         public ExprNode[] arguments;
@@ -211,7 +212,7 @@ namespace AntlrTest
         }
     }
 
-    class DefrefExpr : ExprNode
+    public class DefrefExpr : ExprNode
     {
         public ExprNode operand;
         public DefrefExpr(ExprNode operand) : base(ExprNodeType.LITERAL) { this.operand = operand; }
@@ -227,7 +228,7 @@ namespace AntlrTest
         }
     }
 
-    class RefExpr : ExprNode
+    public class RefExpr : ExprNode
     {
         public string symbol;
         public RefExpr(string symbol) : base(ExprNodeType.LITERAL) { this.symbol = symbol; }
@@ -248,7 +249,7 @@ namespace AntlrTest
         }
     }
 
-    class SymbolLiteralExprNode : ExprNode
+    public class SymbolLiteralExprNode : ExprNode
     {
         public string symbol;
         public SymbolLiteralExprNode(string symbol) : base(ExprNodeType.LITERAL) { this.symbol = symbol; }
@@ -263,7 +264,7 @@ namespace AntlrTest
     }
     #endregion
     #region LogicExprNodes
-    class EqEqExprNode : BinExprNode
+    public class EqEqExprNode : BinExprNode
     {
         public EqEqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.EQEQ, left, right) { }
         public override void Evaluate()
@@ -284,7 +285,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class NeqExprNode : BinExprNode
+
+    public class NeqExprNode : BinExprNode
     {
         public NeqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.NEQ, left, right) { }
         public override void Evaluate()
@@ -305,7 +307,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class AndExprNode : BinExprNode
+
+    public class AndExprNode : BinExprNode
     {
         public AndExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.ADD, left, right) { }
 
@@ -327,7 +330,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class OrExprNode : BinExprNode
+
+    public class OrExprNode : BinExprNode
     {
         public OrExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.OR, left, right) { }
 
@@ -348,7 +352,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class LeqExprNode : BinExprNode
+
+    public class LeqExprNode : BinExprNode
     {
         public LeqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.LEQ, left, right) { }
 
@@ -370,7 +375,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class LssExprNode : BinExprNode
+
+    public class LssExprNode : BinExprNode
     {
         public LssExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.LSS, left, right) { }
 
@@ -392,7 +398,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class GeqExprNode : BinExprNode
+
+    public class GeqExprNode : BinExprNode
     {
         public GeqExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.GEQ, left, right) { }
 
@@ -414,7 +421,8 @@ namespace AntlrTest
             return asm;
         }
     }
-    class GtrExprNode : BinExprNode
+
+    public class GtrExprNode : BinExprNode
     {
         public GtrExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.GTR, left, right) { }
 
