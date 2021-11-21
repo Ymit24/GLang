@@ -30,6 +30,7 @@ statement
 	| while_statement
 	| for_statement
 	| break_stmt
+	| continue_stmt
 	| return_stmt
 	;
 
@@ -46,6 +47,10 @@ for_incrementor : variable_assignment;
 
 break_stmt
 	: BREAK
+	;
+
+continue_stmt
+	: CONTINUE
 	;
 
 if_statement
@@ -119,15 +124,16 @@ BLOCKCOMMENT : '/*' .*? '*/' -> skip;
 fragment LOWERCASE : [a-z] ;
 fragment UPPERCASE : [A-Z] ;
 
-EXTERN : 'extern';
-RETURN : 'ret';
-IF     : 'if';
-ELSEIF : 'elseif';
-ELSE   : 'else';
-WHILE  : 'while';
-FOR    : 'for';
-END    : 'end';
-BREAK  : 'break';
+EXTERN   : 'extern';
+RETURN   : 'ret';
+IF       : 'if';
+ELSEIF   : 'elseif';
+ELSE     : 'else';
+WHILE    : 'while';
+FOR      : 'for';
+END      : 'end';
+BREAK    : 'break';
+CONTINUE : 'continue';
 
 AND    : '&&';
 OR     : '|';

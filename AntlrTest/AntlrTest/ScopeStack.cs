@@ -58,10 +58,12 @@ namespace AntlrTest
 
         class IncrementingScope : Scope
         {
-            public readonly string BreakLabel;
-            public IncrementingScope(ScopeType type, int startingOffset, string breakLabel) : base(type, startingOffset)
+            public readonly string BreakLabel, ContinueLabel;
+            public IncrementingScope(ScopeType type, int startingOffset, string breakLabel, string continueLabel)
+                : base(type, startingOffset)
             {
                 BreakLabel = breakLabel;
+                ContinueLabel = continueLabel;
             }
 
             public override int IncludeSymbol(string symbolName, GDataType type)
@@ -109,7 +111,7 @@ namespace AntlrTest
             }
             else if (type == ScopeType.FUNCTION)
             {
-                VariableScope.Push(new IncrementingScope(type, 4, "_"));
+                VariableScope.Push(new IncrementingScope(type, 4, "_", "_"));
                 return -1;
             }
             else
@@ -118,15 +120,15 @@ namespace AntlrTest
                 switch (type)
                 {
                     case ScopeType.IF: {
-                        VariableScope.Push(new IncrementingScope(type, size, "_"));
+                        VariableScope.Push(new IncrementingScope(type, size, "_", "_"));
                         return ifCounter++;
                     }
                     case ScopeType.WHILE: {
-                        VariableScope.Push(new IncrementingScope(type, size, $".__whileend_{whileCounter}"));
+                        VariableScope.Push(new IncrementingScope(type, size, $".__whileend_{whileCounter}", $".__while_{whileCounter}"));
                         return whileCounter++;
                     }
                     case ScopeType.FOR: {
-                        VariableScope.Push(new IncrementingScope(type, size, $".__forend_{forCounter}"));
+                        VariableScope.Push(new IncrementingScope(type, size, $".__forend_{forCounter}", $".__forinc_{forCounter}"));
                         return forCounter++;
                     }
                     default: { throw new Exception("Failed to determine scope type."); }
@@ -163,6 +165,25 @@ namespace AntlrTest
                 }
             }
             throw new Exception("Could not find a viable break label.");
+        }
+
+        public static string GetContinueLabel()
+        {
+            if (VariableScope.Count == 0)
+            {
+                throw new Exception("Trying to continue in scopes that don't exist.");
+            }
+
+            for (int i = 0; i < VariableScope.Count; i++)
+            {
+                Scope scope = VariableScope.ElementAt(i);
+                if (scope is IncrementingScope)
+                {
+                    if ((scope as IncrementingScope).ContinueLabel != "_")
+                        return (scope as IncrementingScope).ContinueLabel;
+                }
+            }
+            throw new Exception("Could not find a viable continue label.");
         }
 
         public static int IncludeSymbol(string symbolName, GDataType type)

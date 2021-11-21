@@ -357,7 +357,8 @@ namespace AntlrTest
             asm += loop_condition_check_asm;
             asm += "; for body\n";
             asm += body_asm;
-            asm += "; incrementor\n";
+            asm += "; incrementor\n" +
+                  $".__forinc_{currentFor}:\n";
             asm += incrementor_statement_asm;
             asm += "; jump to start of loop\n";
             asm += $"jmp .__for_{currentFor}\n";
@@ -405,6 +406,13 @@ namespace AntlrTest
 
             // TODO: Clean up stack all the way up to break label
             return $"jmp {breakLabel} ; break\n";
+        }
+
+        public override string VisitContinue_stmt([NotNull] gLangParser.Continue_stmtContext context)
+        {
+            string continueLabel = ScopeStack.GetContinueLabel();
+            // TODO: Clean up stack all the way up to break label
+            return $"jmp {continueLabel} ; continue\n";
         }
 
         /// <summary>
