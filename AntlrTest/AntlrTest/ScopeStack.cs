@@ -58,7 +58,12 @@ namespace AntlrTest
 
         class IncrementingScope : Scope
         {
-            public IncrementingScope(ScopeType type, int startingOffset) : base(type, startingOffset) { }
+            public readonly string BreakLabel;
+            public IncrementingScope(ScopeType type, int startingOffset, string breakLabel) : base(type, startingOffset)
+            {
+                BreakLabel = breakLabel;
+            }
+
             public override int IncludeSymbol(string symbolName, GDataType type)
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
@@ -71,29 +76,6 @@ namespace AntlrTest
                 return cacheOffset;
             }
         }
-
-        // TODO: Replace scopes with just parameterized incrementing scopes.
-
-        class FunctionScope : IncrementingScope
-        {
-            public FunctionScope() : base(ScopeType.FUNCTION, 4) { }
-        }
-
-        class IfScope : IncrementingScope
-        {
-            public IfScope(int startingOffset) : base(ScopeType.IF, startingOffset) { }
-        }
-
-        class WhileScope : IncrementingScope
-        {
-            public WhileScope(int startingOffset) : base(ScopeType.WHILE, startingOffset) { }
-        }
-
-        class ForScope : IncrementingScope
-        {
-            public ForScope(int startingOffset) : base(ScopeType.FOR, startingOffset) { }
-        }
-
 
         public class ParameterScope : Scope
         {
@@ -114,78 +96,73 @@ namespace AntlrTest
 
         private static Stack<Scope> VariableScope = new Stack<Scope>();
 
-        // TODO: REPLACE REDUNDANT PUSH/POP FUNCTIONS
+        private static int ifCounter = 0;
+        private static int whileCounter = 0;
+        private static int forCounter = 0;
 
-        public static void PushParameterScope()
+        public static int PushScope(ScopeType type)
         {
-            VariableScope.Push(new ParameterScope());
+            if (type == ScopeType.PARAMETER)
+            {
+                VariableScope.Push(new ParameterScope());
+                return -1;
+            }
+            else if (type == ScopeType.FUNCTION)
+            {
+                VariableScope.Push(new IncrementingScope(type, 4, "_"));
+                return -1;
+            }
+            else
+            {
+                int size = VariableScope.Peek().CurrentOffset;
+                switch (type)
+                {
+                    case ScopeType.IF: {
+                        VariableScope.Push(new IncrementingScope(type, size, "_"));
+                        return ifCounter++;
+                    }
+                    case ScopeType.WHILE: {
+                        VariableScope.Push(new IncrementingScope(type, size, $".__whileend_{whileCounter}"));
+                        return whileCounter++;
+                    }
+                    case ScopeType.FOR: {
+                        VariableScope.Push(new IncrementingScope(type, size, $".__forend_{forCounter}"));
+                        return forCounter++;
+                    }
+                    default: { throw new Exception("Failed to determine scope type."); }
+                }
+            }
         }
 
-        public static void PopParameterScope()
+        public static void PopScope(ScopeType type)
         {
-            if (!(VariableScope.Peek() is ParameterScope))
+            if (VariableScope.Count == 0)
             {
-                throw new Exception("Tried to pop Parameter scope when next scope up was not correct type.");
+                throw new Exception("Trying to pop scope when no scopes exist.");
+            }
+            if (VariableScope.Peek().Type != type)
+            {
+                throw new Exception("Tried to pop scope when next scope up was not correct type.");
             }
             VariableScope.Pop();
         }
 
-        public static void PushFunctionScope() {
-            VariableScope.Push(new FunctionScope());
-        }
-
-        public static void PopFunctionScope()
+        public static string GetBreakLabel()
         {
-            if (!(VariableScope.Peek() is FunctionScope))
+            if (VariableScope.Count == 0)
             {
-                throw new Exception("Tried to pop function scope when next scope up was not correct type.");
+                throw new Exception("Trying to break out of scopes that don't exist.");
             }
-            VariableScope.Pop();
-        }
 
-        public static void PushIfScope()
-        {
-            int size = VariableScope.Peek().CurrentOffset;
-            VariableScope.Push(new IfScope(size));
-        }
-
-        public static void PopIfScope()
-        {
-            if (!(VariableScope.Peek() is IfScope))
+            for (int i = 0; i < VariableScope.Count; i++)
             {
-                throw new Exception("Tried to pop if scope when next scope up was not correct type.");
+                Scope scope = VariableScope.ElementAt(i);
+                if (scope is IncrementingScope)
+                {
+                    if ((scope as IncrementingScope).BreakLabel != "_") return (scope as IncrementingScope).BreakLabel;
+                }
             }
-            VariableScope.Pop();
-        }
-
-        public static void PushWhileScope()
-        {
-            int size = VariableScope.Peek().CurrentOffset;
-            VariableScope.Push(new WhileScope(size));
-        }
-
-        public static void PopWhileScope()
-        {
-            if (!(VariableScope.Peek() is WhileScope))
-            {
-                throw new Exception("Tried to pop while scope when next scope up was not correct type.");
-            }
-            VariableScope.Pop();
-        }
-
-        public static void PushForScope()
-        {
-            int size = VariableScope.Peek().CurrentOffset;
-            VariableScope.Push(new ForScope(size));
-        }
-
-        public static void PopForScope()
-        {
-            if (!(VariableScope.Peek() is ForScope))
-            {
-                throw new Exception("Tried to pop for scope when next scope up was not correct type.");
-            }
-            VariableScope.Pop();
+            throw new Exception("Could not find a viable break label.");
         }
 
         public static int IncludeSymbol(string symbolName, GDataType type)

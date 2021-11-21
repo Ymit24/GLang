@@ -9,13 +9,6 @@ namespace AntlrTest
 {
     class GLangVisitor : gLangBaseVisitor<string>
     {
-        #region trackers
-        private int ifCounter = 0;
-        private int whileCounter = 0;
-        private int forCounter = 0;
-        private Stack<string> breakLabels = new Stack<string>();
-        #endregion
-
         public override string VisitProgram([NotNull] gLangParser.ProgramContext context)
         {
             var headers = context.header_statement();
@@ -91,13 +84,13 @@ namespace AntlrTest
 
             if (parameters.Length != 0)
             {
-                ScopeStack.PushParameterScope();
+                ScopeStack.PushScope(ScopeStack.ScopeType.PARAMETER);
                 foreach (var parameter in parameters)
                 {
                     ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), GetDataType(parameter.DATATYPE().GetText()));
                 }
             }
-            ScopeStack.PushFunctionScope();
+            ScopeStack.PushScope(ScopeStack.ScopeType.FUNCTION);
             
             string innerASM = "";
             foreach (var stmt in stmt_block.statement())
@@ -107,10 +100,10 @@ namespace AntlrTest
             ASM += $"sub esp, {ScopeStack.GetFunctionScopeSize() - 4}\n"; // Remove starting offset bias.
             ASM += innerASM + $"\n;end function {context.SYMBOL_NAME().GetText()}\n";
             
-            ScopeStack.PopFunctionScope();
+            ScopeStack.PopScope(ScopeStack.ScopeType.FUNCTION);
             if (parameters.Length != 0)
             {
-                ScopeStack.PopParameterScope();
+                ScopeStack.PopScope(ScopeStack.ScopeType.PARAMETER);
             }
             return ASM;
         }
@@ -153,18 +146,9 @@ namespace AntlrTest
         {
             string symbolName = context.SYMBOL_NAME().GetText();
 
-            int offset = ScopeStack.GetSymbolOffset(symbolName);
-            if (offset == -1)
-            {
-                Console.WriteLine("Failed to get offset for symbol.");
-            }
-
             string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
-
-            string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
             asm += EvaluateExpressionASM(context.expression());
-            asm += $"mov [ebp{offsetValue}], eax\n";
-
+            asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, eax\n";
             return asm;
         }
 
@@ -252,7 +236,7 @@ namespace AntlrTest
 
             string asm = "; IF BLOCK\n";
 
-            int current_if_level = ifCounter++; // if we encounter a nested if, we make sure it can have its own level space.
+            int current_if_level = ScopeStack.PushScope(ScopeStack.ScopeType.IF);
 
             asm += EvaluateLogicalExpressionASM(if_condition);
             asm += "pop eax\n ; eax now has result of condition (either 0 or 1)\n" +
@@ -271,14 +255,13 @@ namespace AntlrTest
 
             asm += $"jz {nextLabel} ; jump to next label if condition is false\n";
 
-            ScopeStack.PushIfScope();
             string body_asm = Visit(if_body); // push all of if-body code.
             int localSize = ScopeStack.GetCurrentLocalSize();
             if (localSize > 0) {
                 asm += $"sub esp, {localSize} ; make room for block locals\n";
             }
             asm += body_asm;
-            ScopeStack.PopIfScope();
+            ScopeStack.PopScope(ScopeStack.ScopeType.IF);
             if (localSize > 0)
             {
                 asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
@@ -305,7 +288,7 @@ namespace AntlrTest
 
                 asm += $"jz {nextLabel} ; jump to next label if condition is false\n";
 
-                ScopeStack.PushIfScope();
+                ScopeStack.PushScope(ScopeStack.ScopeType.IF);
                 body_asm = Visit(elseifs[i].statement_block()); // push all of if-body code.
                 localSize = ScopeStack.GetCurrentLocalSize();
                 if (localSize > 0)
@@ -313,7 +296,7 @@ namespace AntlrTest
                     asm += $"sub esp, {localSize} ; make room for block locals\n";
                 }
                 asm += body_asm;
-                ScopeStack.PopIfScope();
+                ScopeStack.PopScope(ScopeStack.ScopeType.IF);
                 if (localSize > 0)
                 {
                     asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
@@ -326,7 +309,7 @@ namespace AntlrTest
             {
                 asm += $".__else_{current_if_level}:\n";
 
-                ScopeStack.PushIfScope();
+                ScopeStack.PushScope(ScopeStack.ScopeType.IF);
                 body_asm = Visit(else_stmt.statement_block()); // push all of if-body code.
                 localSize = ScopeStack.GetCurrentLocalSize();
                 if (localSize != 0)
@@ -334,7 +317,7 @@ namespace AntlrTest
                     asm += $"sub esp, {localSize} ; make room for block locals\n";
                 }
                 asm += body_asm;
-                ScopeStack.PopIfScope();
+                ScopeStack.PopScope(ScopeStack.ScopeType.IF);
                 if (localSize != 0)
                 {
                     asm += $"add esp, {localSize} ; restore stack pointer from locals in if_block\n";
@@ -347,10 +330,9 @@ namespace AntlrTest
 
         public override string VisitFor_statement([NotNull] gLangParser.For_statementContext context)
         {
-            int currentFor = forCounter++;
+            int currentFor = ScopeStack.PushScope(ScopeStack.ScopeType.FOR);
             string asm = "";
-
-            ScopeStack.PushForScope();
+            
             string initial_condition_asm = context.for_initial() == null ? "" : Visit(context.for_initial());
             string loop_condition_check_asm = context.logical_expression() == null ? ""
                     : (EvaluateLogicalExpressionASM(context.logical_expression()) +
@@ -359,11 +341,9 @@ namespace AntlrTest
                         $"je .__forend_natural_{currentFor}\n");
 
 
-            breakLabels.Push($".__forend__{currentFor}");
             string body_asm = VisitStatement_block(context.statement_block());
             int localSize = ScopeStack.GetCurrentLocalSize(); // For loops size
-            breakLabels.Pop();
-
+            
             string incrementor_statement_asm = context.for_incrementor() == null ? "" : Visit(context.for_incrementor());
 
             asm += initial_condition_asm;
@@ -387,15 +367,13 @@ namespace AntlrTest
 
             asm += $".__forend_{currentFor}:\n";
 
-            ScopeStack.PopForScope();
+            ScopeStack.PopScope(ScopeStack.ScopeType.FOR);
             return asm;
         }
 
         public override string VisitWhile_statement([NotNull] gLangParser.While_statementContext context)
         {
-            int currentWhile = whileCounter;
-            whileCounter++;
-
+            int currentWhile = ScopeStack.PushScope(ScopeStack.ScopeType.WHILE);
             string asm = $".__while_{currentWhile}:\n";
 
             asm += EvaluateLogicalExpressionASM(context.logical_expression());
@@ -403,10 +381,7 @@ namespace AntlrTest
                    "cmp eax, 0\n ; check if condition was true or false\n" +
                    $"je .__whileend_{currentWhile}\n";
 
-            ScopeStack.PushWhileScope();
-            breakLabels.Push($".__whileend_{currentWhile}");
             string body_asm = Visit(context.statement_block());
-            breakLabels.Pop();
             int localSize = ScopeStack.GetCurrentLocalSize();
             if (localSize != 0)
             {
@@ -414,7 +389,7 @@ namespace AntlrTest
             }
             asm += body_asm;
             asm += $"jmp .__while_{currentWhile}\n";
-            ScopeStack.PopWhileScope();
+            ScopeStack.PopScope(ScopeStack.ScopeType.WHILE);
             if (localSize != 0)
             {
                 asm += $"add esp, {localSize} ; restore stack pointer from locals in while_block\n";
@@ -426,13 +401,10 @@ namespace AntlrTest
 
         public override string VisitBreak_stmt([NotNull] gLangParser.Break_stmtContext context)
         {
-            if (breakLabels.Count == 0)
-            {
-                throw new Exception("Trying to break while outside of breakable block.");
-            }
+            string breakLabel = ScopeStack.GetBreakLabel();
 
             // TODO: Clean up stack all the way up to break label
-            return $"jmp {breakLabels.Peek()} ; break\n";
+            return $"jmp {breakLabel} ; break\n";
         }
 
         /// <summary>
