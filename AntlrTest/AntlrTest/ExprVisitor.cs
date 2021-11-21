@@ -18,6 +18,8 @@ namespace AntlrTest
         DIV,
         NEG,
 
+        CAST,
+
         PREFIX_INC,
         PREFIX_DEC,
         POSTFIX_INC,
@@ -45,14 +47,18 @@ namespace AntlrTest
         public GDataType EvaluateExpressionType()
         {
             GDataType type = null;
-            List<ExprNode> children = GetChildren();
+            List<ExprNode> children = new List<ExprNode>();
             children.Add(this);
+            children.AddRange(GetChildren());
 
             while (children.Count > 0)
             {
                 ExprNode node = children[0];
                 children.RemoveAt(0);
-
+                if (node is CastExpr)
+                {
+                    return (node as CastExpr).right;
+                }
                 if (node is RefExpr)
                 {
                     string symbolName = (node as RefExpr).symbol;
@@ -326,6 +332,35 @@ namespace AntlrTest
         public override List<ExprNode> GetChildren()
         {
             return new List<ExprNode>() { operand };
+        }
+    }
+
+    public class CastExpr : ExprNode
+    {
+        public ExprNode left;
+        public GDataType right;
+        public CastExpr(ExprNode left, GDataType right) : base(ExprNodeType.CAST)
+        {
+            this.left = left;
+            this.right = right;
+        }
+        public override void Evaluate()
+        {
+            left.Evaluate();
+        }
+
+        public override string GenerateASM()
+        {
+            throw new NotImplementedException("This operator does not generate assembly.");
+        }
+
+
+        public override List<ExprNode> GetChildren()
+        {
+            List<ExprNode> children = new List<ExprNode>();
+            children.Add(left);
+            children.AddRange(left.GetChildren());
+            return children;
         }
     }
 
@@ -625,6 +660,8 @@ namespace AntlrTest
         public override ExprNode VisitPreDecrementLiteral([NotNull] gLangParser.PreDecrementLiteralContext context)
             { return new PreDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
 
+        public override ExprNode VisitCastExpr([NotNull] gLangParser.CastExprContext context)
+            { return new CastExpr(Visit(context.expression()), new GDataType(context.datatype().GetText())); }
 
         public override ExprNode VisitParenExpr([NotNull] gLangParser.ParenExprContext context)
             { return Visit(context.expression()); }

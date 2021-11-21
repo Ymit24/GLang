@@ -101,6 +101,7 @@ expression
 	| expression FSLASH expression #DivExpr
 	| expression PLUS expression #AddExpr
 	| expression MINUS expression #SubExpr
+	| expression ARROW datatype #CastExpr
 	| LPAREN expression RPAREN #ParenExpr
 	| function_call #FuncCallExpr
 	| DOLLAR LPAREN expression RPAREN #DefrefExpr
