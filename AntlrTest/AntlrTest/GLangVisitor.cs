@@ -402,16 +402,21 @@ namespace AntlrTest
 
         public override string VisitBreak_stmt([NotNull] gLangParser.Break_stmtContext context)
         {
-            string breakLabel = ScopeStack.GetBreakLabel();
+            ScopeStack.IncrementingScope scope = ScopeStack.GetBreakScope();
 
-            // TODO: Clean up stack all the way up to break label
-            return $"jmp {breakLabel} ; break\n";
+            string asm = "";
+            int size = ScopeStack.GetSizeUnderScope(scope);
+            if (size != 0)
+            {
+                asm += $"add esp, {size} ; clean up sub stack\n";
+            }
+            asm += $"jmp {scope.BreakLabel} ; break\n";
+            return asm;
         }
 
         public override string VisitContinue_stmt([NotNull] gLangParser.Continue_stmtContext context)
         {
             string continueLabel = ScopeStack.GetContinueLabel();
-            // TODO: Clean up stack all the way up to break label
             return $"jmp {continueLabel} ; continue\n";
         }
 

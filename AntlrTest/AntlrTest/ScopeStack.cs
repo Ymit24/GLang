@@ -56,7 +56,7 @@ namespace AntlrTest
             }
         }
 
-        class IncrementingScope : Scope
+        public class IncrementingScope : Scope
         {
             public readonly string BreakLabel, ContinueLabel;
             public IncrementingScope(ScopeType type, int startingOffset, string breakLabel, string continueLabel)
@@ -149,11 +149,11 @@ namespace AntlrTest
             VariableScope.Pop();
         }
 
-        public static string GetBreakLabel()
+        public static IncrementingScope GetBreakScope()
         {
             if (VariableScope.Count == 0)
             {
-                throw new Exception("Trying to break out of scopes that don't exist.");
+                throw new Exception("Trying to find break/continue scope that don't exist.");
             }
 
             for (int i = 0; i < VariableScope.Count; i++)
@@ -161,29 +161,34 @@ namespace AntlrTest
                 Scope scope = VariableScope.ElementAt(i);
                 if (scope is IncrementingScope)
                 {
-                    if ((scope as IncrementingScope).BreakLabel != "_") return (scope as IncrementingScope).BreakLabel;
+                    if ((scope as IncrementingScope).BreakLabel != "_") return (scope as IncrementingScope);
                 }
             }
-            throw new Exception("Could not find a viable break label.");
+            throw new Exception("Could not find a viable break/continue scope.");
+        }
+
+        public static int GetSizeUnderScope(Scope scope)
+        {
+            bool foundScope = false;
+            int size = 0;
+            for (int i = VariableScope.Count - 1; i > -1; i--)
+            {
+                Scope curr = VariableScope.ElementAt(i);
+
+                if (curr == scope) { foundScope = true;      }
+                if (foundScope)    { size += curr.LocalSize; }
+            }
+            return size;
+        }
+
+        public static string GetBreakLabel()
+        {
+            return GetBreakScope().BreakLabel;
         }
 
         public static string GetContinueLabel()
         {
-            if (VariableScope.Count == 0)
-            {
-                throw new Exception("Trying to continue in scopes that don't exist.");
-            }
-
-            for (int i = 0; i < VariableScope.Count; i++)
-            {
-                Scope scope = VariableScope.ElementAt(i);
-                if (scope is IncrementingScope)
-                {
-                    if ((scope as IncrementingScope).ContinueLabel != "_")
-                        return (scope as IncrementingScope).ContinueLabel;
-                }
-            }
-            throw new Exception("Could not find a viable continue label.");
+            return GetBreakScope().ContinueLabel;
         }
 
         public static int IncludeSymbol(string symbolName, GDataType type)
