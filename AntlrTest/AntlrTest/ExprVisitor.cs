@@ -262,6 +262,23 @@ namespace AntlrTest
             return $"push DWORD {ScopeStack.GetSymbolOffsetString(symbol)} ; Push {symbol}\n";
         }
     }
+
+    public class StringLiteralExprNode : ExprNode
+    {
+        public string literal;
+        public StringLiteralExprNode(string literal) : base(ExprNodeType.LITERAL) { this.literal = literal; }
+
+        public override void Evaluate()
+        {
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            string symbol = LiteralValueExtractorVisitor.StringLiteralHolder.GetStringSymbol(literal);
+            return $"push {symbol} ; Push symbol for string literal\n";
+        }
+    }
     #endregion
     #region LogicExprNodes
     public class EqEqExprNode : BinExprNode
@@ -500,6 +517,9 @@ namespace AntlrTest
         {
             return new NegateExprNode(Visit(context.expression()));
         }
+
+        public override ExprNode VisitStringLiteral([NotNull] gLangParser.StringLiteralContext context)
+            { return new StringLiteralExprNode(context.STRING().GetText()); }
 
         public override ExprNode VisitNumberLiteral([NotNull] gLangParser.NumberLiteralContext context)
             { return new NumberExprNode(int.Parse(context.NUMBER().GetText())); }
