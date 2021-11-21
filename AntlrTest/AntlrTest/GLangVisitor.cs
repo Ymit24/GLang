@@ -87,7 +87,7 @@ namespace AntlrTest
                 ScopeStack.PushScope(ScopeStack.ScopeType.PARAMETER);
                 foreach (var parameter in parameters)
                 {
-                    ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), GetDataType(parameter.DATATYPE().GetText()));
+                    ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), new GDataType(parameter.datatype().GetText()));
                 }
             }
             ScopeStack.PushScope(ScopeStack.ScopeType.FUNCTION);
@@ -108,26 +108,12 @@ namespace AntlrTest
             return ASM;
         }
 
-        public GDataType GetDataType(string datatypeString)
-        {
-            GDataType type = GDataType.I32;
-            switch (datatypeString.ToLower())
-            {
-                case "i8": { type = GDataType.I8; break; }
-                case "i16": { type = GDataType.I16; break; }
-                case "i32": { type = GDataType.I32; break; }
-                default: { type = GDataType.I32; break; }
-            }
-            return type;
-        }
-
         public override string VisitVaraibleDecl([NotNull] gLangParser.VaraibleDeclContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
-            string datatype = context.DATATYPE().GetText();
-            GDataType type = GetDataType(datatype);
-
-            int offset = ScopeStack.IncludeSymbol(symbolName, type);
+            string datatype = context.datatype().GetText();
+            
+            int offset = ScopeStack.IncludeSymbol(symbolName, new GDataType(datatype));
             if (offset == -1)
             {
                 Console.WriteLine("Failed to get offset for symbol.");

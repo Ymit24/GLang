@@ -12,11 +12,11 @@ function_declaration
 	;
 
 function_parameter_decl
-	: LPAREN SYMBOL_NAME COLON DATATYPE RPAREN
+	: LPAREN SYMBOL_NAME COLON datatype RPAREN
 	;
 
 function_return_type
-	: ARROW DATATYPE
+	: ARROW datatype 
 	;
 
 statement_block
@@ -65,7 +65,7 @@ else_stmt
 	;
 
 variable_assignment
-	: SYMBOL_NAME COLON DATATYPE EQUALS expression #VaraibleDecl
+	: SYMBOL_NAME COLON datatype EQUALS expression #VaraibleDecl
 	| SYMBOL_NAME EQUALS expression #VaraibleStdAssign
 	| DOLLAR SYMBOL_NAME EQUALS expression #VariableDerefAssign
 	| DOLLAR LPAREN expression RPAREN EQUALS expression #VariableDerefExprAssign
@@ -115,6 +115,8 @@ expression
 	| STRING #StringLiteral
 	;
 
+datatype : SYMBOL_NAME ASTERIK?;
+
 LINE_COMMENT
    : '//' ~[\r\n]* (EOF | '\r'? '\n') -> skip
    ;
@@ -140,7 +142,6 @@ OR     : '|';
 
 COMMA : ',';
 
-DATATYPE : ('i') ('8' | '16' | '32') ASTERIK?;
 SYMBOL_NAME : (LOWERCASE | UPPERCASE) (LOWERCASE | UPPERCASE | [0-9] | '_')*;
 
 ARROW : '->';

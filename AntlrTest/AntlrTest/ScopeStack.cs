@@ -73,7 +73,7 @@ namespace AntlrTest
                 symbolTable.Add(symbolName, currentOffset);
                 int cacheOffset = currentOffset;
 
-                currentOffset += Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
+                currentOffset += type.AlignedSize;
 
                 return cacheOffset;
             }
@@ -90,7 +90,7 @@ namespace AntlrTest
                 symbolTable.Add(symbolName, currentOffset);
                 int cacheOffset = currentOffset;
 
-                currentOffset -= Math.Min(4, GData.GetByteSize(type)); // TODO: CHECK SIZE RESPECTING
+                currentOffset -= type.AlignedSize;
 
                 return cacheOffset;
             }

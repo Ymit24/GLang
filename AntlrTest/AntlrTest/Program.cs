@@ -14,12 +14,12 @@ namespace AntlrTest
         {
             public override void SyntaxError([NotNull] IRecognizer recognizer, [Nullable] IToken offendingSymbol, int line, int charPositionInLine, [NotNull] string msg, [Nullable] RecognitionException e)
             {
-                Console.WriteLine($"Syntax error at line: {line}:{charPositionInLine}. Message: {msg}");
+                throw new Exception($"Syntax error at line: {line}:{charPositionInLine}. Message: {msg}");
             }
 
             public void SyntaxError([NotNull] IRecognizer recognizer, [Nullable] int offendingSymbol, int line, int charPositionInLine, [NotNull] string msg, [Nullable] RecognitionException e)
             {
-                Console.WriteLine($"Syntax error at line: {line}:{charPositionInLine}. Message: {msg}");
+                throw new Exception($"Syntax error at line: {line}:{charPositionInLine}. Message: {msg}");
             }
         }
         static void Main(string[] args)
