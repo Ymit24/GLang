@@ -85,6 +85,8 @@ namespace AntlrTest
             if (parameters.Length != 0)
             {
                 ScopeStack.PushScope(ScopeStack.ScopeType.PARAMETER);
+                // TODO: If return type is non-primitive (e.g. struct or fixed-size-array)
+                //       Push hidden first parameter as pointer to return space.
                 foreach (var parameter in parameters)
                 {
                     ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), new GDataType(parameter.datatype().GetText()));
