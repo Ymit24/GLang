@@ -62,7 +62,7 @@ namespace AntlrTest
 
             public int GetSymbolOffset(string symbolName)
             {
-                return GetSymbol(symbolName).Offset;
+                return GetSymbol(symbolName).EffectiveOffset;
             }
         }
 
@@ -80,7 +80,16 @@ namespace AntlrTest
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
 
-                symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+                if (type.IsPrimitive == false)
+                {
+                    // TODO: INVESTIGATE WHY - 4 WORKS
+                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset + type.AlignedSize - 4));
+                }
+                else
+                {
+                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+                }
+
                 int cacheOffset = currentOffset;
 
                 currentOffset += type.AlignedSize;
@@ -105,7 +114,7 @@ namespace AntlrTest
             public override int IncludeSymbol(string symbolName, GDataType type)
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
-
+                
                 symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
                 int cacheOffset = currentOffset;
 
@@ -248,7 +257,7 @@ namespace AntlrTest
 
         public static int GetSymbolOffset(string symbolName)
         {
-            return GetSymbol(symbolName).Offset;
+            return GetSymbol(symbolName).EffectiveOffset;
         }
 
         public static int GetCurrentLocalSize()

@@ -10,13 +10,19 @@ namespace AntlrTest
     {
         public readonly string Name;
         public readonly GDataType Type;
-        public readonly int Offset;
+
+        /// <summary>
+        /// For primitive types this is their normal offset
+        /// For non primitive types (e.g. arrays) this is the offset to their
+        /// lowest address.
+        /// </summary>
+        public readonly int EffectiveOffset;
 
         public GDataSymbol(string symbol, GDataType type, int offset)
         {
             Name = symbol;
             Type = type;
-            Offset = offset;
+            EffectiveOffset = offset;
         }
     }
 
