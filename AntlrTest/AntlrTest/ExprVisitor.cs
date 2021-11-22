@@ -79,6 +79,7 @@ namespace AntlrTest
                     if (symbol.Type.IsPointer)
                     {
                         type = symbol.Type;
+                        return type;
                     }
                     else if (symbol.Type.IsArray)
                     {
