@@ -89,6 +89,15 @@ namespace AntlrTest
             }
         }
 
+        public class FunctionScope : IncrementingScope
+        {
+            public readonly GFunctionSignature Signature;
+            public FunctionScope(GFunctionSignature signature) : base (ScopeType.FUNCTION, 4, "_", "_")
+            {
+                Signature = signature;
+            }
+        }
+
         public class ParameterScope : Scope
         {
             public ParameterScope() : base(ScopeType.PARAMETER, -8) { }
@@ -112,7 +121,7 @@ namespace AntlrTest
         private static int whileCounter = 0;
         private static int forCounter = 0;
 
-        public static int PushScope(ScopeType type)
+        public static int PushScope(ScopeType type, GFunctionSignature signature = null)
         {
             if (type == ScopeType.PARAMETER)
             {
@@ -121,7 +130,7 @@ namespace AntlrTest
             }
             else if (type == ScopeType.FUNCTION)
             {
-                VariableScope.Push(new IncrementingScope(type, 4, "_", "_"));
+                VariableScope.Push(new FunctionScope(signature));
                 return -1;
             }
             else
@@ -258,6 +267,17 @@ namespace AntlrTest
                 if (scopes[i].Type == type) return size;
             }
             throw new Exception("Could not find scope of type " + type);
+        }
+
+        public static Scope GetInnerScopeOf(ScopeType type)
+        {
+            for (int i = 0; i < VariableScope.Count; i++)
+            {
+                Scope scope = VariableScope.ElementAt(i);
+                if (scope.Type == type)
+                    return scope;
+            }
+            throw new Exception("Could not find scope of type.");
         }
 
         public static int GetFunctionScopeSize()
