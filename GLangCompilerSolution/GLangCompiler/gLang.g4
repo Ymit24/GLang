@@ -4,7 +4,7 @@ program
 	: header_statement* function_declaration+;
 
 header_statement
-	: EXTERN SYMBOL_NAME
+	: EXTERN SYMBOL_NAME (COLON function_parameter_decl? (COMMA function_parameter_decl)*)? function_return_type?
 	;
 
 function_declaration

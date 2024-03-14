@@ -15,14 +15,15 @@ namespace AntlrTest
             var function_declarations = context.function_declaration();
             
             string ASM = "BITS 32\n" +
-                         "global main\n";
+                         "global main\n" +
+                         "extern memcpy ; Make sure we always have this\n";
             foreach (var header in headers)
             {
                 ASM += Visit(header);
             }
             ASM += "section .data\n";
             
-            var dataTable = LiteralValueExtractorVisitor.StringLiteralHolder.stringValueToSymbol;
+            var dataTable = StringLiteralExtractor.StringLiteralHolder.stringValueToSymbol;
 
             foreach (string key in dataTable.Keys)
             {
@@ -74,7 +75,8 @@ namespace AntlrTest
 
         public override string VisitFunction_declaration([NotNull] gLangParser.Function_declarationContext context)
         {
-            string ASM = $"\n;function declaration {context.SYMBOL_NAME().GetText()}\n{context.SYMBOL_NAME().GetText()}:\n" +
+            GFunctionSignature signature = GFunctionSignature.GetSignature(context.SYMBOL_NAME().GetText());
+            string ASM = $"\n;function declaration {signature.Name}\n{context.SYMBOL_NAME().GetText()}:\n" +
                           "push ebp\n" +
                           "mov ebp, esp\n";
             
@@ -82,17 +84,21 @@ namespace AntlrTest
 
             var parameters = context.function_parameter_decl();
 
-            if (parameters.Length != 0)
+            if (parameters.Length != 0 || signature.ReturnIsSpecial)
             {
                 ScopeStack.PushScope(ScopeStack.ScopeType.PARAMETER);
                 // TODO: If return type is non-primitive (e.g. struct or fixed-size-array)
                 //       Push hidden first parameter as pointer to return space.
+                if (signature.ReturnIsSpecial)
+                {
+                    ScopeStack.IncludeSymbol("__retSpecial", GDataType.MakePointerOf(signature.ReturnType));
+                }
                 foreach (var parameter in parameters)
                 {
                     ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), new GDataType(parameter.datatype().GetText()));
                 }
             }
-            ScopeStack.PushScope(ScopeStack.ScopeType.FUNCTION);
+            ScopeStack.PushScope(ScopeStack.ScopeType.FUNCTION, signature);
             
             string innerASM = "";
             foreach (var stmt in stmt_block.statement())
@@ -113,28 +119,40 @@ namespace AntlrTest
         public override string VisitVaraibleDecl([NotNull] gLangParser.VaraibleDeclContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
-            var raw_datatype = context.datatype();
-            string datatypeString = raw_datatype.GetText();
+            string datatypeString = context.datatype().GetText();
 
-            GDataType datatype = null;
-            if (raw_datatype.NUMBER() != null)
-            {
-                datatype = new GDataType(datatypeString, int.Parse(raw_datatype.NUMBER().GetText()));
-            }
-            else
-            {
-                datatype = new GDataType(datatypeString);
-            }
+            GDataType lhs_type = new GDataType(datatypeString);
 
-            ScopeStack.IncludeSymbol(symbolName, datatype);
+            ScopeStack.IncludeSymbol(symbolName, lhs_type);
 
             string asm = "";
 
-            if (datatype.IsArray == false)
+            if (context.NULL_OP() != null)
             {
-                asm += $"\n;variable {symbolName}={context.expression().GetText()}\n";
-                asm += EvaluateExpressionASM(context.expression());
-                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {datatype.MemoryRegister}\n";
+                return ""; // we are not initializing the memory with anything.
+            }
+            asm += $"\n;variable {symbolName}={context.expression().GetText()}\n";
+
+            ExprVisitor visitor = new ExprVisitor();
+            ExprNode root = visitor.Visit(context.expression());
+            asm += ExprEvaluator.EvaluateExpressionTree(root);
+
+            if (lhs_type.IsPrimitive)
+            {
+                asm += "pop eax\n";
+                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {lhs_type.MemoryRegister}\n";
+            }
+            else
+            {
+                GDataType rhs_type = root.EvaluateExpressionType();
+                asm += $"mov eax, esp ; Store rhs address\n" +
+                       $"push {rhs_type.AlignedSize} ; Push size\n" +
+                       $"push eax ; Push rhs address\n" +
+                       $"lea eax, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Compute lhs address\n" +
+                       $"push eax ; Push lhs address\n" +
+                       $"call memcpy\n" +
+                       $"add esp, 12\n" +
+                       $"add esp, {rhs_type.AlignedSize} ; restore stack from temporary type\n";
             }
             return asm;
         }
@@ -146,8 +164,35 @@ namespace AntlrTest
             GDataSymbol symbol = ScopeStack.GetSymbol(symbolName);
 
             string asm = $"\n;variable {symbolName}={context.expression().GetText()}\n";
-            asm += EvaluateExpressionASM(context.expression());
-            asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {symbol.Type.MemoryRegister}\n";
+
+            ExprVisitor visitor = new ExprVisitor();
+            ExprNode root = visitor.Visit(context.expression());
+            asm += ExprEvaluator.EvaluateExpressionTree(root);
+
+            GDataType type = root.EvaluateExpressionType();
+            if (type.IsPrimitive == false)
+            {
+                // Stack should contain the non primitive type
+                // need to memcpy result into LHS and clean stack
+
+                asm += ";lea edx, esp ; Store current stack address in edx\n" +
+                      $"lea eax, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Store LHS address in eax\n";
+                // edx has pointer to "from" space
+                // TODO: COME BACK TO THIS AND CHECK IT
+                // eax has pointer to "to" space
+                asm += $"push {type.AlignedSize} ; Push size\n" +
+                       $"push edx ; Push src*\n" +
+                       $"push eax ; Push dst*\n" +
+                       $"call memcpy\n" +
+                       $"add esp, 12 ; restore stack from memcpy\n" +
+                       $"add esp, {type.AlignedSize} ; restore stack from temporary type\n";
+            }
+            else
+            {
+                asm += "pop eax\n";
+                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {symbol.Type.MemoryRegister}\n";
+            }
+
             return asm;
         }
 
@@ -159,10 +204,32 @@ namespace AntlrTest
 
             string asm = $"\n;variable {(context.DOLLAR() == null ? "" : "$")}{symbolName}={context.expression().GetText()}\n";
 
-            asm += EvaluateExpressionASM(context.expression());
-            asm += $"lea edx, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Move address of pointer varaible into edx\n" +
-                   $"mov edx, [edx] ; Deref the pointer into edx\n" +
-                   $"mov [edx], {symbol.Type.UnderlyingDataType.MemoryRegister} ; mov right hand result into address in edx.\n";
+
+
+            ExprVisitor visitor = new ExprVisitor();
+            ExprNode rhs_root = visitor.Visit(context.expression());
+            asm += ExprEvaluator.EvaluateExpressionTree(rhs_root);
+
+            GDataType rhs_type = rhs_root.EvaluateExpressionType();
+            if (rhs_type.IsPrimitive == false)
+            {
+                asm += $"mov eax, esp ; Store rhs address\n" +
+                       $"push {rhs_type.AlignedSize} ; Push size\n" +
+                       $"push eax ; Push rhs address" +
+                       $"lea eax, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Compute lhs address\n" +
+                       $"mov eax, [eax] ; Deref pointer\n" +
+                       $"push eax ; Push lhs address\n" +
+                       $"call memcpy\n" +
+                       $"add esp, 12\n" +
+                       $"add esp, {rhs_type.AlignedSize} ; restore stack from temporary type\n";
+            }
+            else
+            {
+                asm += "pop eax\n";
+                asm += $"lea edx, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Move address of pointer varaible into edx\n" +
+                       $"mov edx, [edx] ; Deref the pointer into edx\n" +
+                       $"mov [edx], {symbol.Type.UnderlyingDataType.MemoryRegister} ; mov right hand result into address in edx.\n";
+            }
 
             return asm;
         }
@@ -175,10 +242,7 @@ namespace AntlrTest
             ExprNode lhs_root = lhs_visitor.Visit(context.expression(0));
             string lhs_asm = ExprEvaluator.EvaluateExpressionTree(lhs_root);
 
-
-            GDataType type = lhs_root.EvaluateExpressionType();
-
-            int lhs_size = type.MemorySize;
+            GDataType lhs_type = lhs_root.EvaluateExpressionType();
 
             ExprVisitor rhs_visitor = new ExprVisitor();
             ExprNode rhs_root = rhs_visitor.Visit(context.expression(1));
@@ -186,13 +250,28 @@ namespace AntlrTest
 
             // TODO: Once we have floats, this changes things
 
-            asm += rhs_asm; // stack will contain value to write
-            asm += lhs_asm; // stack will contain address to write to
 
-            asm += "pop edx ; Load address\n" +
-                   "pop eax ; Load value\n";
-
-            asm += $"mov [edx], {type.UnderlyingDataType.MemoryRegister} ; Type sensitive write\n";
+            GDataType rhs_type = rhs_root.EvaluateExpressionType();
+            if (rhs_type.IsPrimitive == false)
+            {
+                asm += rhs_asm; // stack will contain rhs
+                asm += lhs_asm; // stack will contain address to write to
+                asm += $"pop edx ; Store lhs_address\n";
+                asm += $"mov eax, esp ; Store rhs address\n" +
+                       $"push {rhs_type.AlignedSize} ; Push size\n" +
+                       $"push eax ; Push rhs address" +
+                       $"call memcpy\n" +
+                       $"add esp, 12\n" +
+                       $"add esp, {rhs_type.AlignedSize} ; restore stack from temporary type\n";
+            }
+            else
+            {
+                asm += rhs_asm; // stack will contain value to write
+                asm += lhs_asm; // stack will contain address to write to
+                asm += "pop edx ; Load address\n" +
+                       "pop eax ; Load value\n" +
+                       $"mov [edx], {lhs_type.UnderlyingDataType.MemoryRegister} ; type sensitive write\n";
+            }
             return asm;
         }
 
@@ -425,9 +504,7 @@ namespace AntlrTest
         {
             ExprVisitor visitor = new ExprVisitor();
             ExprNode root = visitor.Visit(context);
-            string asm = ExprEvaluator.EvaluateExpressionTree(root);
-            asm += "pop eax\n";
-            return asm;
+            return ExprEvaluator.EvaluateExpressionTree(root);
         }
 
         /// <summary>
@@ -444,10 +521,33 @@ namespace AntlrTest
 
         public override string VisitReturn_stmt([NotNull] gLangParser.Return_stmtContext context)
         {
+            GFunctionSignature signature
+                = (ScopeStack.GetInnerScopeOf(ScopeStack.ScopeType.FUNCTION)
+                    as ScopeStack.FunctionScope).Signature;
+
             string asm = "";
+
             if (context.expression() != null)
             {
+                GDataSymbol retSymbol = ScopeStack.GetSymbol("__retSpecial");
                 asm += EvaluateExpressionASM(context.expression());
+                if (signature.ReturnIsSpecial)
+                {
+                    // stack holds special thing
+                    asm += $"mov edx, esp ; Compute stack address\n" +
+                           $"push {signature.ReturnSize} ; Push size\n" +
+                           $"push edx; Push src*\n" +
+                           $"lea edx, {ScopeStack.GetSymbolOffsetString("__retSpecial")} ; Compute address of return space\n" +
+                           $"push edx ; Push dst*\n" +
+                           $"call memcpy\n" +
+                           $"add esp, 12\n" +
+                           $"add esp, {signature.ReturnSize} ; clean up special stack\n";
+                    asm += "mov eax, edx ; Move address of special stack into eax\n";
+                }
+                else
+                {
+                    asm += "pop eax\n";
+                }
             }
 
             return asm +
@@ -459,37 +559,76 @@ namespace AntlrTest
 
         public override string VisitFunction_call([NotNull] gLangParser.Function_callContext context)
         {
-            if (context.function_arguments() == null)
+            GFunctionSignature signature = GFunctionSignature.GetSignature(context.SYMBOL_NAME().GetText());
+
+            bool hasNonPrimitiveReturn = signature.ReturnType != null && signature.ReturnType.IsPrimitive == false;
+
+            string asm = "";
+            int returnSize = 0;
+            if (hasNonPrimitiveReturn)
             {
-                return $"call {context.SYMBOL_NAME().GetText()}\n";
+                // Non primative return type.
+                returnSize = signature.ReturnType.AlignedSize;
+                asm += $"sub esp, {returnSize} ; Push space for return type\n";
             }
 
-            var args = context.function_arguments().expression();
-            string ASM = $"";
-
-            foreach (var argv in args.Reverse())
+            if (context.function_arguments() != null && context.function_arguments().expression().Length != 0)
             {
-                if (argv is gLangParser.StringLiteralContext)
+                if (signature.IsExtern == false && context.function_arguments().expression().Length != signature.Parameters.Count)
+                    throw new Exception("Incorrect number of parameters passed to function.");
+
+                var args = context.function_arguments().expression();
+                asm = $"";
+
+                foreach (var argv in args.Reverse())
                 {
-                    string arg = argv.GetText();
-                    string symbol = LiteralValueExtractorVisitor.StringLiteralHolder.GetStringSymbol(arg);
-                    if (symbol == null)
+                    if (argv is gLangParser.StringLiteralContext)
                     {
-                        Console.WriteLine($"Could not expand {arg} to symbol or primative literal.");
-                        ASM += "push DWORD 0\n";
+                        string arg = argv.GetText();
+                        string symbol = StringLiteralExtractor.StringLiteralHolder.GetStringSymbol(arg);
+
+                        asm += $"push {symbol}\n";
                         continue;
                     }
-                    ASM += $"push {symbol}\n";
-                    continue;
+                    // TODO: these could be non-primitives, if so, evaluate expression leaving
+                    //       non-primitive on stack to be passed as parameter.
+                    asm += EvaluateExpressionASM(argv);
+                    //asm += "pop eax\n";
+                    //asm += "push eax\n";
                 }
 
-                ASM += EvaluateExpressionASM(argv);
-                ASM += "push eax\n";
+                if (hasNonPrimitiveReturn)
+                {
+                    // Non primative return type.
+                    asm += $"lea edx, [esp+{args.Length * 4}] ; lowest address related to special space" +
+                           $"push edx ; push return space pointer as hidden first parameter\n";
+                }
+
+                asm += $"call {signature.Name}\n" +
+                       $"add esp, {(args.Length * 4)}\n"; // TODO: Fix assumption of 4 bytes per arg
+
+                // Remove special stack from standalone function call.
+                if (hasNonPrimitiveReturn)
+                {
+                    asm += $"add esp, {returnSize} ; clean up special stack\n";
+                }
+                return asm;
             }
 
-            ASM += $"call {context.SYMBOL_NAME().GetText()}\n" +
-                   $"add esp, {args.Length * 4}\n"; // TODO: Fix assumption of 4 bytes per arg
-            return ASM;
+            if (hasNonPrimitiveReturn)
+            {
+                // Non primative return type.
+                asm += "push esp ; push return space pointer as hidden first parameter\n";
+            }
+
+            asm += $"call {signature.Name}\n";
+
+            // Remove special stack from standalone function call.
+            if (hasNonPrimitiveReturn)
+            {
+                asm += $"add esp, {returnSize} ; clean up special stack\n";
+            }
+            return asm;
         }
     }
 }

@@ -58,13 +58,16 @@ namespace AntlrTest
 
             var context = parser.program();
 
-            var stringLiteralExtratorPass = new LiteralValueExtractorVisitor();
+            var stringExtractor = new StringLiteralExtractor();
+            var functionExtractor = new FunctionExtractor();
             var visitor = new GLangVisitor();
 
-            stringLiteralExtratorPass.Visit(context); // process the program for string literals.
+            stringExtractor.Visit(context); // process the program for strings
+            functionExtractor.Visit(context);// process the program for functions
 
-            var table = LiteralValueExtractorVisitor.StringLiteralHolder.stringValueToSymbol;
+            var table = StringLiteralExtractor.StringLiteralHolder.stringValueToSymbol;
             Console.WriteLine($"string literals found: {table.Count}.");
+
 
             string code = visitor.Visit(context);
             Console.WriteLine("Output:\n" + code);

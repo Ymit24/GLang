@@ -8,21 +8,31 @@ namespace AntlrTest
 {
     public class GDataSymbol
     {
-        public readonly string Symbol;
+        public readonly string Name;
         public readonly GDataType Type;
-        public readonly int Offset;
+
+        /// <summary>
+        /// For primitive types this is their normal offset
+        /// For non primitive types (e.g. arrays) this is the offset to their
+        /// lowest address.
+        /// </summary>
+        public readonly int EffectiveOffset;
 
         public GDataSymbol(string symbol, GDataType type, int offset)
         {
-            Symbol = symbol;
+            Name = symbol;
             Type = type;
-            Offset = offset;
+            EffectiveOffset = offset;
         }
     }
 
     public class GDataType
     {
-        public readonly string Type;
+        public readonly string TypeString;
+        /// <summary>
+        /// Primitives are 4 bytes or less, or pointers.
+        /// Arrays and types are Non-Primitive.
+        /// </summary>
         public readonly bool IsPrimitive;
         public readonly bool IsSigned;
         public readonly int IdealSize;
@@ -102,8 +112,42 @@ namespace AntlrTest
         public readonly int ElementCount;
         public readonly GDataType UnderlyingDataType;
 
+        public static GDataType MakePointerOf(GDataType underlying)
+        {
+            return new GDataType(underlying);
+        }
+
+        /// <summary>
+        /// Pointer constructor
+        /// </summary>
+        /// <param name="underlying"></param>
+        private GDataType(GDataType underlying)
+        {
+            IsPointer = true;
+            IdealSize = 4;
+            UnderlyingDataType = underlying;
+            IsPrimitive = true; // Pointer is a primitive type.
+            IsSigned = false;
+            ElementCount = 0;
+            TypeString = underlying.TypeString + "*";
+
+        }
+
         public GDataType(string type)
         {
+            if (type.Contains("("))
+            {
+                IsArray = true;
+                IsPointer = false;
+                UnderlyingDataType = new GDataType(type.Split('(')[0]);
+                IsPrimitive = false; // array is not a primitive type.
+                IsSigned = false;
+                ElementCount = int.Parse(type.Split('(')[1].Split(')')[0]);
+                IdealSize = UnderlyingDataType.IdealSize * ElementCount;
+                TypeString = type;
+                return;
+            }
+
             if (type.Contains("*"))
             {
                 IsPointer = true;
@@ -112,7 +156,7 @@ namespace AntlrTest
                 IsPrimitive = true; // Pointer is a primitive type.
                 IsSigned = false;
                 ElementCount = 0;
-                Type = type;
+                TypeString = type;
                 return;
             }
 
@@ -134,20 +178,7 @@ namespace AntlrTest
             ElementCount = 0;
             IsArray = false;
 
-            Type = type;
-        }
-
-        public GDataType(string type, int elementCount)
-        {
-            UnderlyingDataType = new GDataType(type);
-            ElementCount = elementCount;
-            
-            IsPointer = false;
-            IsArray = true;
-
-            Type = type;
-            IdealSize = UnderlyingDataType.IdealSize * elementCount;
-            IsPrimitive = UnderlyingDataType.IsPrimitive;
+            TypeString = type;
         }
     }
 }

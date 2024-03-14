@@ -62,7 +62,7 @@ namespace AntlrTest
 
             public int GetSymbolOffset(string symbolName)
             {
-                return GetSymbol(symbolName).Offset;
+                return GetSymbol(symbolName).EffectiveOffset;
             }
         }
 
@@ -80,12 +80,30 @@ namespace AntlrTest
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
 
-                symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+                if (type.IsPrimitive == false)
+                {
+                    // TODO: INVESTIGATE WHY - 4 WORKS
+                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset + type.AlignedSize - 4));
+                }
+                else
+                {
+                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+                }
+
                 int cacheOffset = currentOffset;
 
                 currentOffset += type.AlignedSize;
 
                 return cacheOffset;
+            }
+        }
+
+        public class FunctionScope : IncrementingScope
+        {
+            public readonly GFunctionSignature Signature;
+            public FunctionScope(GFunctionSignature signature) : base (ScopeType.FUNCTION, 4, "_", "_")
+            {
+                Signature = signature;
             }
         }
 
@@ -96,7 +114,7 @@ namespace AntlrTest
             public override int IncludeSymbol(string symbolName, GDataType type)
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
-
+                
                 symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
                 int cacheOffset = currentOffset;
 
@@ -112,7 +130,7 @@ namespace AntlrTest
         private static int whileCounter = 0;
         private static int forCounter = 0;
 
-        public static int PushScope(ScopeType type)
+        public static int PushScope(ScopeType type, GFunctionSignature signature = null)
         {
             if (type == ScopeType.PARAMETER)
             {
@@ -121,7 +139,7 @@ namespace AntlrTest
             }
             else if (type == ScopeType.FUNCTION)
             {
-                VariableScope.Push(new IncrementingScope(type, 4, "_", "_"));
+                VariableScope.Push(new FunctionScope(signature));
                 return -1;
             }
             else
@@ -239,7 +257,7 @@ namespace AntlrTest
 
         public static int GetSymbolOffset(string symbolName)
         {
-            return GetSymbol(symbolName).Offset;
+            return GetSymbol(symbolName).EffectiveOffset;
         }
 
         public static int GetCurrentLocalSize()
@@ -258,6 +276,17 @@ namespace AntlrTest
                 if (scopes[i].Type == type) return size;
             }
             throw new Exception("Could not find scope of type " + type);
+        }
+
+        public static Scope GetInnerScopeOf(ScopeType type)
+        {
+            for (int i = 0; i < VariableScope.Count; i++)
+            {
+                Scope scope = VariableScope.ElementAt(i);
+                if (scope.Type == type)
+                    return scope;
+            }
+            throw new Exception("Could not find scope of type.");
         }
 
         public static int GetFunctionScopeSize()
