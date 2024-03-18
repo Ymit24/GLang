@@ -529,10 +529,11 @@ namespace AntlrTest
 
             if (context.expression() != null)
             {
-                GDataSymbol retSymbol = ScopeStack.GetSymbol("__retSpecial");
                 asm += EvaluateExpressionASM(context.expression());
                 if (signature.ReturnIsSpecial)
                 {
+                    // NOTE: IS THIS EVEN USED..?
+                    // GDataSymbol retSymbol = ScopeStack.GetSymbol("__retSpecial");
                     // stack holds special thing
                     asm += $"mov edx, esp ; Compute stack address\n" +
                            $"push {signature.ReturnSize} ; Push size\n" +

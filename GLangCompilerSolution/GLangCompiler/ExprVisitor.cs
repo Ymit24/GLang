@@ -338,7 +338,8 @@ namespace AntlrTest
                     asm += "push esp ; push return space pointer as hidden first parameter\n";
                 }
 
-                asm += $"call {signature.Name}\n";
+                asm += $"call {signature.Name}\n"
+                     + $"push eax\n";
                 return asm;
             }
 
@@ -356,6 +357,7 @@ namespace AntlrTest
 
             asm += $"call {functionName}\n" +
                    $"add esp, {arguments.Length * 4}\n";
+            Console.WriteLine("==========HAS NON PRIM RET: " + hasNonPrimitiveReturn);
             if (!hasNonPrimitiveReturn)
                 asm += "push eax\n";
             return asm;
