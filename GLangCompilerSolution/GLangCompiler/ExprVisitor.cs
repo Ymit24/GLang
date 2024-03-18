@@ -172,6 +172,21 @@ namespace AntlrTest
         }
     }
 
+    public class MulExprNode : BinExprNode
+    {
+        public MulExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.MUL, left, right) { }
+        public override void Evaluate()
+        {
+            left.Evaluate();
+            right.Evaluate();
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+        public override string GenerateASM()
+        {
+            return $"pop edx ; Get Right\npop eax ; Get Left\nmul edx ; Multiply with edx\npush eax ; Push result\n";
+        }
+    }
+
     public class NegateExprNode : ExprNode
     {
         public ExprNode value;
@@ -755,6 +770,8 @@ namespace AntlrTest
             { return new AddExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
         public override ExprNode VisitSubExpr([NotNull] gLangParser.SubExprContext context)
             { return new SubExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
+        public override ExprNode VisitMulExpr([NotNull] gLangParser.MulExprContext context)
+            { return new MulExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
 
         public override ExprNode VisitPostIncrementLiteral([NotNull] gLangParser.PostIncrementLiteralContext context)
             { return new PostIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
