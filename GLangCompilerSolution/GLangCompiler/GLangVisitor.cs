@@ -13,7 +13,7 @@ namespace AntlrTest
         {
             var headers = context.header_statement();
             var function_declarations = context.function_declaration();
-            
+
             string ASM = "BITS 32\n" +
                          "global main\n" +
                          "extern memcpy ; Make sure we always have this\n";
@@ -22,7 +22,7 @@ namespace AntlrTest
                 ASM += Visit(header);
             }
             ASM += "section .data\n";
-            
+
             var dataTable = StringLiteralExtractor.StringLiteralHolder.stringValueToSymbol;
 
             foreach (string key in dataTable.Keys)
@@ -79,7 +79,7 @@ namespace AntlrTest
             string ASM = $"\n;function declaration {signature.Name}\n{context.SYMBOL_NAME().GetText()}:\n" +
                           "push ebp\n" +
                           "mov ebp, esp\n";
-            
+
             var stmt_block = context.statement_block();
 
             var parameters = context.function_parameter_decl();
@@ -99,7 +99,7 @@ namespace AntlrTest
                 }
             }
             ScopeStack.PushScope(ScopeStack.ScopeType.FUNCTION, signature);
-            
+
             string innerASM = "";
             foreach (var stmt in stmt_block.statement())
             {
@@ -107,7 +107,7 @@ namespace AntlrTest
             }
             ASM += $"sub esp, {ScopeStack.GetFunctionScopeSize() - 4}\n"; // Remove starting offset bias.
             ASM += innerASM + $"\n;end function {context.SYMBOL_NAME().GetText()}\n";
-            
+
             ScopeStack.PopScope(ScopeStack.ScopeType.FUNCTION);
             if (parameters.Length != 0)
             {
@@ -140,7 +140,15 @@ namespace AntlrTest
             if (lhs_type.IsPrimitive)
             {
                 asm += "pop eax\n";
-                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {lhs_type.MemoryRegister}\n";
+                // Using EAX to move full value into variable.
+                // This is because we don't properly handle variables below 4 bytes.
+                // If we say try and printf a u16 what happens is the two padding bytes
+                // (which could have any value) get loaded into printf.
+                // We could add extra instructions so that we only push the 2 bytes
+                // but that isn't implemented. Since everything is 4 byte aligned,
+                // we can safely overwrite the padding bytes to 0 and everything should
+                // still work.
+                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, eax\n";
             }
             else
             {
@@ -278,7 +286,7 @@ namespace AntlrTest
         public override string VisitVariableIncrementAssign([NotNull] gLangParser.VariableIncrementAssignContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
-            
+
             ExprNode root = new PostIncrementLiteral(new SymbolLiteralExprNode(symbolName));
             return root.GenerateASM();
         }
@@ -331,7 +339,8 @@ namespace AntlrTest
 
             string body_asm = Visit(if_body); // push all of if-body code.
             int localSize = ScopeStack.GetCurrentLocalSize();
-            if (localSize > 0) {
+            if (localSize > 0)
+            {
                 asm += $"sub esp, {localSize} ; make room for block locals\n";
             }
             asm += body_asm;
@@ -353,7 +362,7 @@ namespace AntlrTest
                 nextLabel = $".__endif_{current_if_level}";
                 if (i != elseifs.Length - 1)
                 {
-                    nextLabel = $".__elseif_{current_if_level}_{i+1}";
+                    nextLabel = $".__elseif_{current_if_level}_{i + 1}";
                 }
                 else if (else_stmt != null)
                 {
@@ -406,7 +415,7 @@ namespace AntlrTest
         {
             int currentFor = ScopeStack.PushScope(ScopeStack.ScopeType.FOR);
             string asm = "";
-            
+
             string initial_condition_asm = context.for_initial() == null ? "" : Visit(context.for_initial());
             string loop_condition_check_asm = context.logical_expression() == null ? ""
                     : (EvaluateLogicalExpressionASM(context.logical_expression()) +
@@ -417,7 +426,7 @@ namespace AntlrTest
 
             string body_asm = VisitStatement_block(context.statement_block());
             int localSize = ScopeStack.GetCurrentLocalSize(); // For loops size
-            
+
             string incrementor_statement_asm = context.for_incrementor() == null ? "" : Visit(context.for_incrementor());
 
             asm += initial_condition_asm;

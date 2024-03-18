@@ -144,7 +144,7 @@ namespace AntlrTest
     #region StdExprNodes
     public class AddExprNode : BinExprNode
     {
-        public AddExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.ADD, left, right) {}
+        public AddExprNode(ExprNode left, ExprNode right) : base(ExprNodeType.ADD, left, right) { }
         public override void Evaluate()
         {
             left.Evaluate();
@@ -196,7 +196,7 @@ namespace AntlrTest
             value.Evaluate();
             ExprEvaluator.currentExprStack.Add(this);
         }
-        
+
         public override string GenerateASM()
         {
             throw new NotImplementedException();
@@ -320,12 +320,12 @@ namespace AntlrTest
         public string functionName;
         public ExprNode[] arguments;
         public FunctionCallExprNode(string functionName, ExprNode[] arguments)
-            : base (ExprNodeType.FUNCTION_CALL)
+            : base(ExprNodeType.FUNCTION_CALL)
         {
             this.functionName = functionName;
             this.arguments = arguments;
         }
-        
+
         public override void Evaluate()
         {
             ExprEvaluator.currentExprStack.Add(this);
@@ -520,7 +520,8 @@ namespace AntlrTest
                             $"add esp, 12\n";
                 return asm;
             }
-            return $"push DWORD {ScopeStack.GetSymbolOffsetString(symbolName)} ; Push {symbolName} value\n";
+            // NOTE: This might just always be DWORD.
+            return $"push {symbol.Type.AsmType} {ScopeStack.GetSymbolOffsetString(symbolName)} ; Push {symbolName} value\n";
         }
 
         public override List<ExprNode> GetChildren()
@@ -746,47 +747,47 @@ namespace AntlrTest
             return Visit(context.logical_expression());
         }
         public override ExprNode VisitEqEqExpr([NotNull] gLangParser.EqEqExprContext context)
-            { return new EqEqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new EqEqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitNeqExpr([NotNull] gLangParser.NeqExprContext context)
-            { return new NeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new NeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitAndExpr([NotNull] gLangParser.AndExprContext context)
-            { return new AndExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new AndExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitOrExpr([NotNull] gLangParser.OrExprContext context)
-            { return new OrExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new OrExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
 
         public override ExprNode VisitLEQExpr([NotNull] gLangParser.LEQExprContext context)
-            { return new LeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new LeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitLSSExpr([NotNull] gLangParser.LSSExprContext context)
-            { return new LssExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new LssExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitGEQExpr([NotNull] gLangParser.GEQExprContext context)
-            { return new GeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new GeqExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
         public override ExprNode VisitGTRExpr([NotNull] gLangParser.GTRExprContext context)
-            { return new GtrExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
+        { return new GtrExprNode(Visit(context.logical_expression(0)), Visit(context.logical_expression(1))); }
     }
 
     class ExprVisitor : gLangBaseVisitor<ExprNode>
     {
         public override ExprNode VisitAddExpr([NotNull] gLangParser.AddExprContext context)
-            { return new AddExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
+        { return new AddExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
         public override ExprNode VisitSubExpr([NotNull] gLangParser.SubExprContext context)
-            { return new SubExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
+        { return new SubExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
         public override ExprNode VisitMulExpr([NotNull] gLangParser.MulExprContext context)
-            { return new MulExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
+        { return new MulExprNode(Visit(context.expression(0)), Visit(context.expression(1))); }
 
         public override ExprNode VisitPostIncrementLiteral([NotNull] gLangParser.PostIncrementLiteralContext context)
-            { return new PostIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        { return new PostIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
         public override ExprNode VisitPostDecrementLiteral([NotNull] gLangParser.PostDecrementLiteralContext context)
-            { return new PostDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        { return new PostDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
         public override ExprNode VisitPreIncrementLiteral([NotNull] gLangParser.PreIncrementLiteralContext context)
-            { return new PreIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        { return new PreIncrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
         public override ExprNode VisitPreDecrementLiteral([NotNull] gLangParser.PreDecrementLiteralContext context)
-            { return new PreDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
+        { return new PreDecrementLiteral(new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText())); }
 
         public override ExprNode VisitCastExpr([NotNull] gLangParser.CastExprContext context)
-            { return new CastExpr(Visit(context.expression()), new GDataType(context.datatype().GetText())); }
+        { return new CastExpr(Visit(context.expression()), new GDataType(context.datatype().GetText())); }
 
         public override ExprNode VisitParenExpr([NotNull] gLangParser.ParenExprContext context)
-            { return Visit(context.expression()); }
+        { return Visit(context.expression()); }
 
         public override ExprNode VisitNegateExpr([NotNull] gLangParser.NegateExprContext context)
         {
@@ -794,13 +795,13 @@ namespace AntlrTest
         }
 
         public override ExprNode VisitStringLiteral([NotNull] gLangParser.StringLiteralContext context)
-            { return new StringLiteralExprNode(context.STRING().GetText()); }
+        { return new StringLiteralExprNode(context.STRING().GetText()); }
 
         public override ExprNode VisitNumberLiteral([NotNull] gLangParser.NumberLiteralContext context)
-            { return new NumberLiteralExprNode(int.Parse(context.NUMBER().GetText())); }
-        
+        { return new NumberLiteralExprNode(int.Parse(context.NUMBER().GetText())); }
+
         public override ExprNode VisitSymbolLiteral([NotNull] gLangParser.SymbolLiteralContext context)
-            { return new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText()); }
+        { return new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText()); }
 
         public override ExprNode VisitFuncCallExpr([NotNull] gLangParser.FuncCallExprContext context)
         {
