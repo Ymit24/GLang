@@ -1,5 +1,9 @@
 extern printf
 
+#test:(a: u8),(b:u16),(c:u8),(d:u32):
+    [printf "a: %u b: %u c: %u d: %u\n", a, b, c, d]
+    ret
+
 #main:
     a:u16=27320
     b:u32=529320
@@ -10,6 +14,9 @@ extern printf
     g:u16=21
     h:u8=21
     i:u32=21
+
+    [test e, a, e, b]
+
     [printf "A: %u B: %u C: %u D: %u E: %u\n", a, b, c, d, e]
     ret 0
 

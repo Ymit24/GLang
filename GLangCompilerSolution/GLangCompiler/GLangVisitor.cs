@@ -124,9 +124,9 @@ namespace AntlrTest
                 innerASM += VisitStatement(stmt);
             }
 
-            var functionScope = ScopeStack.GetInnerScopeOf(ScopeStack.ScopeType.FUNCTION);
+            var functionScope = ScopeStack.GetInnerScopeOf(ScopeStack.ScopeType.FUNCTION) as ScopeStack.FunctionScope;
             // Align the function scope's stack.
-            (functionScope as ScopeStack.AlignedScope).CompleteAndAlignStack();
+            functionScope.CompleteAndAlignStack();
 
             ASM += $"sub esp, {ScopeStack.GetFunctionScopeSize()}\n";
             ASM += innerASM + $"\n;end function {context.SYMBOL_NAME().GetText()}\n";
@@ -154,7 +154,7 @@ namespace AntlrTest
             {
                 return ""; // we are not initializing the memory with anything.
             }
-            asm += $"\n;variable {symbolName}={context.expression().GetText()}\n";
+            asm += $"\n;variable {symbolName}:{datatypeString}={context.expression().GetText()}\n";
 
             ExprVisitor visitor = new ExprVisitor();
             ExprNode root = visitor.Visit(context.expression());
@@ -171,7 +171,7 @@ namespace AntlrTest
                 // but that isn't implemented. Since everything is 4 byte aligned,
                 // we can safely overwrite the padding bytes to 0 and everything should
                 // still work.
-                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, eax\n";
+                asm += $"mov {ScopeStack.GetSymbolOffsetString(symbolName)}, {lhs_type.MemoryRegister}\n";
             }
             else
             {

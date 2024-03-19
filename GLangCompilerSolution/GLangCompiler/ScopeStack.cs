@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AntlrTest
 {
@@ -77,61 +75,50 @@ namespace AntlrTest
                 ContinueLabel = continueLabel;
             }
 
-            public override int IncludeSymbol(string symbolName, GDataType type)
+            /// Determine the change in offset from the currentOffset that
+            /// the IncludeSymbol function will use. This is always a positive
+            /// number.
+            protected int ComputeInclusionOffset(GDataType type)
             {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
+                int offset = 0;
 
-                if (type.IsPrimitive == false)
+                if (type.IsPrimitive)
                 {
-                    // TODO: INVESTIGATE WHY - 4 WORKS
-                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset + type.AlignedSize - 4));
+                    Console.WriteLine($"{type.TypeString} :: Is Word Aligned: {IsWORDAligned()}. Size: {type.AlignedSize}. Current Offset: {currentOffset}");
+                    // so u8, u16, u32, etc...
+                    if (type.AlignedSize == 4 && !IsDWORDAligned())
+                    {
+                        // Align ourselves to a DWORD boundary
+                        offset += GetDWORDAlignmentOffset();
+                    }
+                    else if (type.AlignedSize == 2 && !IsWORDAligned())
+                    {
+                        // Align ourselves to a WORD boundary
+                        offset += GetWORDAlignmentOffset();
+                    }
+
+                    offset += type.IdealSize;
                 }
                 else
                 {
-                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+                    throw new Exception("Non primitives are not yet implemeneted here");
                 }
-
-                int cacheOffset = currentOffset;
-
-                currentOffset += type.AlignedSize;
-
-                return cacheOffset;
+                Console.WriteLine($"Changed offse: {offset}");
+                return offset;
             }
-        }
 
-        public class FunctionScope : AlignedScope
-        {
-            public readonly GFunctionSignature Signature;
-            public FunctionScope(GFunctionSignature signature) : base(ScopeType.FUNCTION, 0, "_", "_")
-            {
-                Signature = signature;
-            }
-        }
-
-        public class ParameterScope : Scope
-        {
-            public ParameterScope() : base(ScopeType.PARAMETER, -8) { }
-
+            /// Include a symbol in the scope. Automatically handles adding
+            /// padding bytes for alignment.
             public override int IncludeSymbol(string symbolName, GDataType type)
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
 
+                int offset = ComputeInclusionOffset(type);
+                currentOffset += offset;
                 symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
-                int cacheOffset = currentOffset;
-
-                // TODO: Add proper alignment here
-                // ALSO, make sure non-primitives work properly
-                currentOffset -= type.AlignedSize;
-
-                return cacheOffset;
+                return currentOffset;
             }
-        }
 
-        /// General purpose scope for computing alignment.
-        public class AlignedScope : IncrementingScope
-        {
-            public AlignedScope(ScopeType type, int startingOffset, string breakLabel, string continueLabel)
-                : base(type, startingOffset, breakLabel, continueLabel) { }
             /// Determine if this scope is aligned to a WORD (16bit) boundary.
             protected bool IsWORDAligned()
             {
@@ -156,32 +143,6 @@ namespace AntlrTest
                 return (4 - (currentOffset % 4)) % 4;
             }
 
-            public override int IncludeSymbol(string symbolName, GDataType type)
-            {
-                if (symbolTable.ContainsKey(symbolName)) return -1;
-
-                if (type.IsPrimitive)
-                {
-                    Console.WriteLine($"Is Word Aligned: {IsWORDAligned()}. Size: {type.AlignedSize}. Current Offset: {currentOffset}");
-                    // so u8, u16, u32, etc...
-                    if (type.AlignedSize == 4 && !IsDWORDAligned())
-                    {
-                        // Align ourselves to a DWORD boundary
-                        currentOffset += GetDWORDAlignmentOffset();
-                    }
-                    else if (type.AlignedSize == 2 && !IsWORDAligned())
-                    {
-                        // Align ourselves to a WORD boundary
-                        currentOffset += GetWORDAlignmentOffset();
-                    }
-
-                    currentOffset += type.IdealSize;
-                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
-                    return currentOffset;
-                }
-                return -1;
-            }
-
             /// Call after all variables have been pushed into the scope.
             /// This will add any extra padding to make sure the scope is 
             /// DWORD aligned.
@@ -197,9 +158,32 @@ namespace AntlrTest
                     currentOffset += GetDWORDAlignmentOffset();
                 }
             }
+        }
 
-            // TODO: Add function to 'rectify' stack size after all variables are
-            // added so the overall 'structure' is aligned.
+        public class FunctionScope : IncrementingScope
+        {
+            public readonly GFunctionSignature Signature;
+            public FunctionScope(GFunctionSignature signature) : base(ScopeType.FUNCTION, 0, "_", "_")
+            {
+                Signature = signature;
+            }
+        }
+
+        public class ParameterScope : IncrementingScope
+        {
+            public ParameterScope() : base(ScopeType.PARAMETER, -8, "_", "_") { }
+
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                // NOTE: All parameters are DWORD aligned.
+                symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+
+                const int offset = 4;
+                currentOffset -= offset;
+                return currentOffset;
+            }
         }
 
         public class StructScope : IncrementingScope
