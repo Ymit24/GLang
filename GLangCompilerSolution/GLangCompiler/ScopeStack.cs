@@ -182,6 +182,22 @@ namespace AntlrTest
                 return -1;
             }
 
+            /// Call after all variables have been pushed into the scope.
+            /// This will add any extra padding to make sure the scope is 
+            /// DWORD aligned.
+            ///
+            /// Note: If used for struct alignment, this only needs to be aligned
+            /// to highest alignment condition. If the struct only contains BYTES
+            /// and WORDS, then only WORD alignment is required. This optimization
+            /// is currently unimplemented.
+            public void CompleteAndAlignStack()
+            {
+                if (!IsDWORDAligned())
+                {
+                    currentOffset += GetDWORDAlignmentOffset();
+                }
+            }
+
             // TODO: Add function to 'rectify' stack size after all variables are
             // added so the overall 'structure' is aligned.
         }

@@ -123,7 +123,12 @@ namespace AntlrTest
             {
                 innerASM += VisitStatement(stmt);
             }
-            ASM += $"sub esp, {ScopeStack.GetFunctionScopeSize() - 4}\n"; // Remove starting offset bias.
+
+            var functionScope = ScopeStack.GetInnerScopeOf(ScopeStack.ScopeType.FUNCTION);
+            // Align the function scope's stack.
+            (functionScope as ScopeStack.AlignedScope).CompleteAndAlignStack();
+
+            ASM += $"sub esp, {ScopeStack.GetFunctionScopeSize()}\n";
             ASM += innerASM + $"\n;end function {context.SYMBOL_NAME().GetText()}\n";
 
             ScopeStack.PopScope(ScopeStack.ScopeType.FUNCTION);

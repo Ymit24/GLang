@@ -6,6 +6,10 @@ extern printf
     c:u32=23132
     d:u16=9823
     e:u8=21
+    f:u8=21
+    g:u16=21
+    h:u8=21
+    i:u32=21
     [printf "A: %u B: %u C: %u D: %u E: %u\n", a, b, c, d, e]
     ret 0
 
