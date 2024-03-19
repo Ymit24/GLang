@@ -158,6 +158,7 @@ namespace AntlrTest
 
             foreach (var raw_field in context.function_parameter_decl())
             {
+                
             }
 
             GStructSignature signature = new GStructSignature(name, fields);
