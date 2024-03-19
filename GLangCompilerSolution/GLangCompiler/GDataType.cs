@@ -32,7 +32,7 @@ namespace AntlrTest
         public readonly string TypeString;
         /// <summary>
         /// Primitives are 4 bytes or less, or pointers.
-        /// Arrays and types are Non-Primitive.
+        /// Arrays and structs are Non-Primitive.
         /// </summary>
         public readonly bool IsPrimitive;
         public readonly bool IsSigned;
@@ -144,7 +144,6 @@ namespace AntlrTest
             IsSigned = false;
             ElementCount = 0;
             TypeString = underlying.TypeString + "*";
-
         }
 
         public GDataType(string type)
@@ -182,9 +181,9 @@ namespace AntlrTest
             else if (type.ToLower().Contains("32")) { IdealSize = 4; }
             else
             {
-                IsPrimitive = false;
-                IdealSize = -1;
-                throw new NotImplementedException("Non primitive types are not done.");
+                var struct_type = GStructSignature.GetSignature(type).Type;
+                IdealSize = struct_type.IdealSize;
+                Console.WriteLine($"Found existing struct type: {struct_type.TypeString}");
             }
 
             IsSigned = IsPrimitive && type.ToLower().Contains("i");
@@ -193,6 +192,20 @@ namespace AntlrTest
             IsArray = false;
 
             TypeString = type;
+        }
+
+        /// This is for defining types for structures.
+        public GDataType(string struct_name, int alignedSize)
+        {
+            IsPrimitive = false;
+            IsPointer = false;
+            IsArray = false;
+            ElementCount = 0;
+            TypeString = struct_name;
+            IsSigned = false;
+
+            IdealSize = alignedSize;
+            UnderlyingDataType = null;
         }
     }
 }

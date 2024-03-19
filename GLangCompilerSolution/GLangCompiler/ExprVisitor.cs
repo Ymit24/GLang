@@ -12,6 +12,7 @@ namespace AntlrTest
     {
         LITERAL,
         FUNCTION_CALL,
+        STRUCT_INST,
         ADD,
         SUB,
         MUL,
@@ -99,6 +100,16 @@ namespace AntlrTest
                 {
                     GFunctionSignature signature = GFunctionSignature.GetSignature((node as FunctionCallExprNode).functionName);
                     return signature.ReturnType;
+                }
+            }
+
+            for (int i = 0; i < children.Count; i++)
+            {
+                ExprNode node = children[i];
+                if (node is StructInstExprNode)
+                {
+                    GStructSignature signature = GStructSignature.GetSignature((node as StructInstExprNode).StructName);
+                    return signature.Type;
                 }
             }
 
@@ -314,7 +325,68 @@ namespace AntlrTest
             return new List<ExprNode>() { };
         }
     }
+    public class StructInstExprNode : ExprNode
+    {
+        public readonly string StructName;
+        public readonly ExprNode[] FieldInitializers;
+        public StructInstExprNode(string structName, ExprNode[] fieldInitializers)
+            : base(ExprNodeType.STRUCT_INST)
+        {
+            StructName = structName;
+            FieldInitializers = fieldInitializers;
+        }
 
+        public override void Evaluate()
+        {
+            ExprEvaluator.currentExprStack.Add(this);
+        }
+
+        public override string GenerateASM()
+        {
+            GStructSignature signature = GStructSignature.GetSignature(StructName);
+            string asm = "";
+
+            asm += $"sub esp, {signature.AlignedSize} ; Reserve space for the struct.\n";
+            asm += "push esp ; push return space pointer as hidden first parameter\n";
+
+            if (signature.Fields.Count != FieldInitializers.Length)
+            {
+                throw new Exception("Incorrect number of field initializers.");
+            }
+
+            for (int i = 0; i < FieldInitializers.Length; i++)
+            {
+                var initializer = FieldInitializers[i];
+                var field = signature.Fields[i];
+
+                asm += ExprEvaluator.EvaluateExpressionTree(initializer);
+
+                // Here the value is sitting on the stack.
+                // we need to move this into the struct.
+
+                // If this value is a primitive or pointer than we can trivially
+                // load it into the struct
+                if (field.Type.IsPrimitive || field.Type.IsPointer)
+                {
+                    asm += $"pop eax ; Load value into register\n";
+                    asm += $"mov [esp+{signature.AlignedSize}-{field.EffectiveOffset}], {field.Type.MemoryRegister}\n";
+                }
+                else
+                {
+                    throw new NotImplementedException($"Non-primitive field initialization not yet implemented. Struct name: {signature.Name}, field: ({field.Name}:{field.Type.TypeString})");
+                }
+            }
+
+            return asm;
+        }
+
+        public override List<ExprNode> GetChildren()
+        {
+            // TODO: Check if this is okay
+            return new List<ExprNode>() { this };
+        }
+
+    }
     public class FunctionCallExprNode : ExprNode
     {
         public string functionName;
@@ -523,7 +595,8 @@ namespace AntlrTest
                 return asm;
             }
             // NOTE: This might just always be DWORD.
-            if (symbol.Type.IdealSize != 4) {
+            if (symbol.Type.IdealSize != 4)
+            {
                 return $"movzx eax, {symbol.Type.AsmType} {ScopeStack.GetSymbolOffsetString(symbolName)} ; load the value into eax\n" +
                        $"push eax ; Push new value onto stack (This will always be DWORD.)\n";
             }
@@ -809,6 +882,17 @@ namespace AntlrTest
         public override ExprNode VisitSymbolLiteral([NotNull] gLangParser.SymbolLiteralContext context)
         { return new SymbolLiteralExprNode(context.SYMBOL_NAME().GetText()); }
 
+        public override ExprNode VisitStructInstExpr([NotNull] gLangParser.StructInstExprContext context)
+        {
+            var fieldInitializers = context.struct_instantiation().struct_field_initializers().struct_field_initializer();
+
+            List<ExprNode> fieldInitializerExprs = new List<ExprNode>();
+            foreach (var fieldInitializer in fieldInitializers)
+            {
+                fieldInitializerExprs.Add(Visit(fieldInitializer));
+            }
+            return new StructInstExprNode(context.struct_instantiation().SYMBOL_NAME().GetText(), fieldInitializerExprs.ToArray());
+        }
         public override ExprNode VisitFuncCallExpr([NotNull] gLangParser.FuncCallExprContext context)
         {
             if (context.function_call().function_arguments() == null)

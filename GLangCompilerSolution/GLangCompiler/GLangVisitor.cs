@@ -84,6 +84,7 @@ namespace AntlrTest
 
         public override string VisitStruct_definition([NotNull] gLangParser.Struct_definitionContext context)
         {
+            // NOTE: This doesn't 'compile' to anything.
             Console.WriteLine($"Found struct definition. Name: {context.SYMBOL_NAME()}");
             foreach (var decl in context.function_parameter_decl())
             {
@@ -564,8 +565,6 @@ namespace AntlrTest
                 asm += EvaluateExpressionASM(context.expression());
                 if (signature.ReturnIsSpecial)
                 {
-                    // NOTE: IS THIS EVEN USED..?
-                    // GDataSymbol retSymbol = ScopeStack.GetSymbol("__retSpecial");
                     // stack holds special thing
                     asm += $"mov edx, esp ; Compute stack address\n" +
                            $"push {signature.ReturnSize} ; Push size\n" +

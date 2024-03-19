@@ -84,6 +84,17 @@ function_call
 function_arguments
 	: expression (COMMA expression)*;
 
+struct_instantiation
+    : LEFT_BRACE SYMBOL_NAME struct_field_initializers RIGHT_BRACE
+    ;
+
+struct_field_initializers
+    : struct_field_initializer (COMMA struct_field_initializer)*
+    ;
+struct_field_initializer
+    : SYMBOL_NAME COLON expression
+    ;
+
 return_stmt	: RETURN expression?;
 
 logical_expression
@@ -108,6 +119,7 @@ expression
 	| expression ARROW datatype #CastExpr
 	| LPAREN expression RPAREN #ParenExpr
 	| function_call #FuncCallExpr
+    | struct_instantiation #StructInstExpr
 	| DOLLAR LPAREN expression RPAREN #DefrefExpr
 	| DOLLAR SYMBOL_NAME #DefrefSymbolLiteral
 	| AT SYMBOL_NAME #RefLiteral
@@ -173,6 +185,8 @@ PERCENT : '%';
 
 LEFT_BRACKET : '[';
 RIGHT_BRACKET: ']';
+LEFT_BRACE : '{';
+RIGHT_BRACE: '}';
 LPAREN : '(';
 RPAREN : ')';
 NULL_OP : '_';

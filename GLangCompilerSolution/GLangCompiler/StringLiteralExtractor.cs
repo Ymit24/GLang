@@ -63,14 +63,18 @@ namespace AntlrTest
     {
         public readonly string Name;
         public readonly List<GDataSymbol> Fields;
+        public readonly int AlignedSize;
+        public readonly GDataType Type;
 
         private static Dictionary<string, GStructSignature> StructSignatures
             = new Dictionary<string, GStructSignature>();
 
-        public GStructSignature(string name, List<GDataSymbol> fields)
+        public GStructSignature(string name, List<GDataSymbol> fields, int alignedSize)
         {
             Name = name;
+            Type = new GDataType(name, alignedSize);
             Fields = fields;
+            AlignedSize = alignedSize;
         }
 
         public static void IncludeSignature(GStructSignature signature)
@@ -156,12 +160,23 @@ namespace AntlrTest
             var name = context.SYMBOL_NAME().GetText();
             var fields = new List<GDataSymbol>();
 
+            var scope = ScopeStack.PushStructScope(name);
+
             foreach (var raw_field in context.function_parameter_decl())
             {
-                
+                var field_type = new GDataType(raw_field.datatype().GetText());
+                var field_name = raw_field.SYMBOL_NAME().GetText();
+                scope.IncludeSymbol(field_name, field_type);
+                var field_symbol = scope.GetSymbol(field_name);
+                fields.Add(field_symbol);
             }
 
-            GStructSignature signature = new GStructSignature(name, fields);
+            scope.CompleteAndAlignStack();
+            var alignedSize = scope.CurrentOffset;
+
+            ScopeStack.PopScope(ScopeStack.ScopeType.STRUCT);
+
+            GStructSignature signature = new GStructSignature(name, fields, alignedSize);
             Console.WriteLine($"Extracted Struct Signature: {signature.ToString()}");
             GStructSignature.IncludeSignature(signature);
             return null;

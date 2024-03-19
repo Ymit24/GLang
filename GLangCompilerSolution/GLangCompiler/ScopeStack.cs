@@ -101,7 +101,13 @@ namespace AntlrTest
                 }
                 else
                 {
-                    throw new Exception("Non primitives are not yet implemeneted here");
+                    Console.WriteLine($"Computing inclusion offset for non-primitive: {type.TypeString} of size {type.AlignedSize}");
+                    // All structs are assumed DWORD aligned.
+                    if (!IsDWORDAligned())
+                    {
+                        offset += GetDWORDAlignmentOffset();
+                    }
+                    offset += type.AlignedSize;
                 }
                 Console.WriteLine($"Changed offse: {offset}");
                 return offset;
@@ -188,10 +194,10 @@ namespace AntlrTest
 
         public class StructScope : IncrementingScope
         {
-            public readonly GStructSignature Signature;
-            public StructScope(GStructSignature signature) : base(ScopeType.STRUCT, 0, "_", "_")
+            public readonly string Name;
+            public StructScope(string name) : base(ScopeType.STRUCT, 0, "_", "_")
             {
-                Signature = signature;
+                Name = name;
             }
         }
 
@@ -201,14 +207,16 @@ namespace AntlrTest
         private static int whileCounter = 0;
         private static int forCounter = 0;
 
-        public static void PushFunctionScope(GFunctionSignature func_signature = null)
+        public static void PushFunctionScope(GFunctionSignature func_signature)
         {
             VariableScope.Push(new FunctionScope(func_signature));
         }
 
-        public static void PushStructScope(GStructSignature struct_signature = null)
+        public static StructScope PushStructScope(string struct_name)
         {
-            VariableScope.Push(new StructScope(struct_signature));
+            var scope = new StructScope(struct_name);
+            VariableScope.Push(scope);
+            return scope;
         }
 
         public static int PushScope(ScopeType type)
@@ -317,6 +325,12 @@ namespace AntlrTest
             {
                 throw new Exception($"Failed to find offset for symbol \"{symbolName}\".");
             }
+            return GetOffsetString(offset);
+        }
+
+        /// Determine the offset string for a given offset value
+        public static string GetOffsetString(int offset)
+        {
             string offsetValue = (offset < 0) ? $"+{Math.Abs(offset)}" : $"-{offset}";
             return $"[ebp{offsetValue}]"; // TODO: respect datasize.
         }

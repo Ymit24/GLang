@@ -1,34 +1,27 @@
 extern printf
 
-#test:(a: u8),(b:u16),(c:u8),(d:u32):
-    [printf "a: %u b: %u c: %u d: %u\n", a, b, c, d]
+%example:(a:u8),(b:u8)
+
+
+#takes_example:(e1:example):
     ret
 
+#returns_example:(a:u8)->example:
+    ret { example a: a, b: 0 }
+
 #main:
-    a:u16=27320
-    b:u32=529320
-    c:u32=23132
-    d:u16=9823
-    e:u8=21
-    f:u8=21
-    g:u16=21
-    h:u8=21
-    i:u32=21
-
-    [test e, a, e, b]
-
-    [printf "A: %u B: %u C: %u D: %u E: %u\n", a, b, c, d, e]
+    some_example : example = { example a: 10, b: 0 }
     ret 0
 
 ///*
 //
 //ESP ----
-//-00 0 a4
-//-01 0 p
+//-00 0 e.a
+//-01 0 e.b
 //-02 0 p
 //-03 0 p
-//-04 0 b2
-//-05 0 b1
+//-04 0
+//-05 0
 //-06 0
 //-07 0
 //-08 0
