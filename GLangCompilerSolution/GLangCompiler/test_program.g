@@ -1,27 +1,35 @@
 extern printf
 
-#test:(a:u16), (b: u32), (c: u8):
-    [printf "A: %#04X %#04X %#04X\n", a, b, c]
-    ret
-
-#fib:(n:i32)->i32:
-    if (n<=1):
-        ret 1
-    end
-    ret [fib n-1] + [fib n-2]
-
 #main:
-    a:u8=0 // secret u32
-    b:u8=8 // secret u32
-    c:u8=8 // secret u32
-    d:u16=8 // secret u32
-    e:u8=8 // secret u32
-    // We need 2 bytes of padding here
-    f:u32=2
-    g:u16=3 // secret u32
-    [test a, f, f] // spooky
-    [printf "Values: %#04X %#04X %#04X %#04X %#04X %#04X %#04X\n", a->u8, b, c, d, e, f, g]
-    for (i:i32=0,i<20,i++):
-        [printf "Fib of %d is %d\n", i, [fib i]]
-    end
+    a:u16=27320
+    b:u32=529320
+    c:u32=23132
+    d:u16=9823
+    e:u8=21
+    [printf "A: %u B: %u C: %u D: %u E: %u\n", a, b, c, d, e]
     ret 0
+
+///*
+//
+//ESP ----
+//-00 0 a4
+//-01 0 p
+//-02 0 p
+//-03 0 p
+//-04 0 b2
+//-05 0 b1
+//-06 0
+//-07 0
+//-08 0
+//-09 0
+//-10 0
+//-11 0
+//-12 0
+//-13 0
+//-14 0
+//-15 0
+//-16 0
+//-17 0
+//-18 0
+//-19 0
+//*.

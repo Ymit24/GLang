@@ -14,7 +14,8 @@ namespace AntlrTest
         /// <summary>
         /// For primitive types this is their normal offset
         /// For non primitive types (e.g. arrays) this is the offset to their
-        /// lowest address.
+        /// lowest address. For struct types, this is their offset relative
+        /// to their struct base pointer.
         /// </summary>
         public readonly int EffectiveOffset;
 
@@ -64,7 +65,17 @@ namespace AntlrTest
             {
                 if (IsPointer) return 4;
 
-                return IdealSize % 4 == 0 ? IdealSize : (IdealSize + (4 - (IdealSize % 4)));
+                switch (IdealSize)
+                {
+                    case 1: return 1;
+                    case 2: return 2;
+                    case 3: return 4; // There are no 3 byte primitives so this might not be needed
+                    case 4: return 4;
+                    default: throw new Exception("Invalid IdealSize");
+                }
+
+                // NOTE: Updating how this works.
+                // return IdealSize % 4 == 0 ? IdealSize : (IdealSize + (4 - (IdealSize % 4)));
             }
         }
 

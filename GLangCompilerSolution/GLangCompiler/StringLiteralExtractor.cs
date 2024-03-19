@@ -59,6 +59,39 @@ namespace AntlrTest
         }
     }
 
+    public class GStructSignature
+    {
+        public readonly string Name;
+        public readonly List<GDataSymbol> Fields;
+
+        private static Dictionary<string, GStructSignature> StructSignatures
+            = new Dictionary<string, GStructSignature>();
+
+        public GStructSignature(string name, List<GDataSymbol> fields)
+        {
+            Name = name;
+            Fields = fields;
+        }
+
+        public static void IncludeSignature(GStructSignature signature)
+        {
+            if (StructSignatures.ContainsKey(signature.Name)) return;
+            StructSignatures.Add(signature.Name, signature);
+        }
+
+        public static GStructSignature GetSignature(string name)
+        {
+            if (StructSignatures.ContainsKey(name)) return StructSignatures[name];
+            throw new Exception($"Struct Signature \"{name}\" Not Found.");
+        }
+
+
+        public override string ToString()
+        {
+            return $"<Name:{Name},FieldCount:{Fields.Count}>";
+        }
+    }
+
     public class FunctionExtractor : gLangBaseVisitor<string>
     {
         public override string VisitHeader_statement([NotNull] gLangParser.Header_statementContext context)
@@ -115,6 +148,25 @@ namespace AntlrTest
             return null;
         }
     }
+
+    public class StructExtractor : gLangBaseVisitor<string>
+    {
+        public override string VisitStruct_definition(gLangParser.Struct_definitionContext context)
+        {
+            var name = context.SYMBOL_NAME().GetText();
+            var fields = new List<GDataSymbol>();
+
+            foreach (var raw_field in context.function_parameter_decl())
+            {
+            }
+
+            GStructSignature signature = new GStructSignature(name, fields);
+            Console.WriteLine($"Extracted Struct Signature: {signature.ToString()}");
+            GStructSignature.IncludeSignature(signature);
+            return null;
+        }
+    }
+
     public class StringLiteralExtractor : gLangBaseVisitor<string>
     {
         public class StringLiteralHolder

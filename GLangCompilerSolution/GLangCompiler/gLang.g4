@@ -1,7 +1,7 @@
 grammar gLang;
 
 program
-	: header_statement* function_declaration+;
+	: header_statement* (function_declaration | struct_definition)*;
 
 header_statement
 	: EXTERN SYMBOL_NAME (COLON function_parameter_decl? (COMMA function_parameter_decl)*)? function_return_type?
@@ -18,6 +18,10 @@ function_parameter_decl
 function_return_type
 	: ARROW datatype 
 	;
+
+struct_definition
+    : PERCENT SYMBOL_NAME COLON function_parameter_decl (COMMA function_parameter_decl)*
+    ;
 
 statement_block
 	: statement*
@@ -165,6 +169,7 @@ ASTERIK : '*';
 FSLASH : '/';
 DOLLAR : '$';
 AT : '@';
+PERCENT : '%';
 
 LEFT_BRACKET : '[';
 RIGHT_BRACKET: ']';

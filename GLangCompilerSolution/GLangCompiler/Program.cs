@@ -60,14 +60,15 @@ namespace AntlrTest
 
             var stringExtractor = new StringLiteralExtractor();
             var functionExtractor = new FunctionExtractor();
+            var structExtractor = new StructExtractor();
             var visitor = new GLangVisitor();
 
             stringExtractor.Visit(context); // process the program for strings
+            structExtractor.Visit(context);// process the program for structs
             functionExtractor.Visit(context);// process the program for functions
 
             var table = StringLiteralExtractor.StringLiteralHolder.stringValueToSymbol;
             Console.WriteLine($"string literals found: {table.Count}.");
-
 
             string code = visitor.Visit(context);
             Console.WriteLine("Output:\n" + code);

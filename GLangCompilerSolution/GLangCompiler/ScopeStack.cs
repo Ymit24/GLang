@@ -14,7 +14,8 @@ namespace AntlrTest
             PARAMETER,
             IF,
             FOR,
-            WHILE
+            WHILE,
+            STRUCT
         }
 
         public abstract class Scope
@@ -98,10 +99,10 @@ namespace AntlrTest
             }
         }
 
-        public class FunctionScope : IncrementingScope
+        public class FunctionScope : AlignedScope
         {
             public readonly GFunctionSignature Signature;
-            public FunctionScope(GFunctionSignature signature) : base(ScopeType.FUNCTION, 4, "_", "_")
+            public FunctionScope(GFunctionSignature signature) : base(ScopeType.FUNCTION, 0, "_", "_")
             {
                 Signature = signature;
             }
@@ -118,9 +119,79 @@ namespace AntlrTest
                 symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
                 int cacheOffset = currentOffset;
 
+                // TODO: Add proper alignment here
+                // ALSO, make sure non-primitives work properly
                 currentOffset -= type.AlignedSize;
 
                 return cacheOffset;
+            }
+        }
+
+        /// General purpose scope for computing alignment.
+        public class AlignedScope : IncrementingScope
+        {
+            public AlignedScope(ScopeType type, int startingOffset, string breakLabel, string continueLabel)
+                : base(type, startingOffset, breakLabel, continueLabel) { }
+            /// Determine if this scope is aligned to a WORD (16bit) boundary.
+            protected bool IsWORDAligned()
+            {
+                return currentOffset % 2 == 0;
+            }
+
+            /// Compute how many bytes are needed to ensure WORD alignment.
+            protected int GetWORDAlignmentOffset()
+            {
+                return (2 - (currentOffset % 2)) % 2;
+            }
+
+            /// Determine if this scope is aligned to a WORD (16bit) boundary.
+            protected bool IsDWORDAligned()
+            {
+                return currentOffset % 4 == 0;
+            }
+
+            /// Compute how many bytes are needed to ensure DWORD alignment.
+            protected int GetDWORDAlignmentOffset()
+            {
+                return (4 - (currentOffset % 4)) % 4;
+            }
+
+            public override int IncludeSymbol(string symbolName, GDataType type)
+            {
+                if (symbolTable.ContainsKey(symbolName)) return -1;
+
+                if (type.IsPrimitive)
+                {
+                    Console.WriteLine($"Is Word Aligned: {IsWORDAligned()}. Size: {type.AlignedSize}. Current Offset: {currentOffset}");
+                    // so u8, u16, u32, etc...
+                    if (type.AlignedSize == 4 && !IsDWORDAligned())
+                    {
+                        // Align ourselves to a DWORD boundary
+                        currentOffset += GetDWORDAlignmentOffset();
+                    }
+                    else if (type.AlignedSize == 2 && !IsWORDAligned())
+                    {
+                        // Align ourselves to a WORD boundary
+                        currentOffset += GetWORDAlignmentOffset();
+                    }
+
+                    currentOffset += type.IdealSize;
+                    symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
+                    return currentOffset;
+                }
+                return -1;
+            }
+
+            // TODO: Add function to 'rectify' stack size after all variables are
+            // added so the overall 'structure' is aligned.
+        }
+
+        public class StructScope : IncrementingScope
+        {
+            public readonly GStructSignature Signature;
+            public StructScope(GStructSignature signature) : base(ScopeType.STRUCT, 0, "_", "_")
+            {
+                Signature = signature;
             }
         }
 
@@ -130,16 +201,21 @@ namespace AntlrTest
         private static int whileCounter = 0;
         private static int forCounter = 0;
 
-        public static int PushScope(ScopeType type, GFunctionSignature signature = null)
+        public static void PushFunctionScope(GFunctionSignature func_signature = null)
+        {
+            VariableScope.Push(new FunctionScope(func_signature));
+        }
+
+        public static void PushStructScope(GStructSignature struct_signature = null)
+        {
+            VariableScope.Push(new StructScope(struct_signature));
+        }
+
+        public static int PushScope(ScopeType type)
         {
             if (type == ScopeType.PARAMETER)
             {
                 VariableScope.Push(new ParameterScope());
-                return -1;
-            }
-            else if (type == ScopeType.FUNCTION)
-            {
-                VariableScope.Push(new FunctionScope(signature));
                 return -1;
             }
             else

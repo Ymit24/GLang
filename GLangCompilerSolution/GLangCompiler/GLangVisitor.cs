@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Example.Generated;
 using Antlr4.Runtime.Misc;
+
 namespace AntlrTest
 {
     class GLangVisitor : gLangBaseVisitor<string>
@@ -13,6 +11,7 @@ namespace AntlrTest
         {
             var headers = context.header_statement();
             var function_declarations = context.function_declaration();
+            var struct_declarations = context.struct_definition();
 
             string ASM = "BITS 32\n" +
                          "global main\n" +
@@ -61,10 +60,20 @@ namespace AntlrTest
                 ASM += $"{dataTable[key]}: db {code}, 0\n";
             }
             ASM += "section .text\n";
+
+            // These are global structs which should live for the entire program.
+            // Later, structs can also be made local within functions.
+            foreach (var struct_decl in struct_declarations)
+            {
+                // NOTE: These struct scopes are global and live
+                // for the entire program.
+                VisitStruct_definition(struct_decl);
+            }
             foreach (var func_decl in function_declarations)
             {
                 ASM += VisitFunction_declaration(func_decl);
             }
+            // TODO: Check if struct DECLS need to be popped.
             return ASM;
         }
 
@@ -73,6 +82,15 @@ namespace AntlrTest
             return $"extern {context.SYMBOL_NAME().GetText()}\n";
         }
 
+        public override string VisitStruct_definition([NotNull] gLangParser.Struct_definitionContext context)
+        {
+            Console.WriteLine($"Found struct definition. Name: {context.SYMBOL_NAME()}");
+            foreach (var decl in context.function_parameter_decl())
+            {
+                Console.WriteLine($"\t{decl.SYMBOL_NAME()} of type {decl.datatype().SYMBOL_NAME()}");
+            }
+            return VisitChildren(context);
+        }
         public override string VisitFunction_declaration([NotNull] gLangParser.Function_declarationContext context)
         {
             GFunctionSignature signature = GFunctionSignature.GetSignature(context.SYMBOL_NAME().GetText());
@@ -98,7 +116,7 @@ namespace AntlrTest
                     ScopeStack.IncludeSymbol(parameter.SYMBOL_NAME().GetText(), new GDataType(parameter.datatype().GetText()));
                 }
             }
-            ScopeStack.PushScope(ScopeStack.ScopeType.FUNCTION, signature);
+            ScopeStack.PushFunctionScope(signature);
 
             string innerASM = "";
             foreach (var stmt in stmt_block.statement())
@@ -234,7 +252,7 @@ namespace AntlrTest
             else
             {
                 asm += "pop eax\n";
-                asm += $"lea edx, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Move address of pointer varaible into edx\n" +
+                asm += $"lea edx, {ScopeStack.GetSymbolOffsetString(symbolName)} ; Move address of pointer variable into edx\n" +
                        $"mov edx, [edx] ; Deref the pointer into edx\n" +
                        $"mov [edx], {symbol.Type.UnderlyingDataType.MemoryRegister} ; mov right hand result into address in edx.\n";
             }
@@ -577,7 +595,7 @@ namespace AntlrTest
             int returnSize = 0;
             if (hasNonPrimitiveReturn)
             {
-                // Non primative return type.
+                // Non primitive return type.
                 returnSize = signature.ReturnType.AlignedSize;
                 asm += $"sub esp, {returnSize} ; Push space for return type\n";
             }
@@ -609,7 +627,7 @@ namespace AntlrTest
 
                 if (hasNonPrimitiveReturn)
                 {
-                    // Non primative return type.
+                    // Non primitive return type.
                     asm += $"lea edx, [esp+{args.Length * 4}] ; lowest address related to special space" +
                            $"push edx ; push return space pointer as hidden first parameter\n";
                 }
@@ -627,7 +645,7 @@ namespace AntlrTest
 
             if (hasNonPrimitiveReturn)
             {
-                // Non primative return type.
+                // Non primitive return type.
                 asm += "push esp ; push return space pointer as hidden first parameter\n";
             }
 
