@@ -406,6 +406,7 @@ namespace AntlrTest
         {
             GDataType type = operand.EvaluateExpressionType();
 
+            // TODO: This might be simplifiable using existing AsmType on the type.
             string asmType = ((type.IsPointer || type.IsArray) ? type.UnderlyingDataType.AsmType : type.AsmType);
 
             string asm = "";
@@ -505,6 +506,7 @@ namespace AntlrTest
         public override string GenerateASM()
         {
             GDataSymbol symbol = ScopeStack.GetSymbol(symbolName);
+            // TODO: Modify this when structs are impl'd.
             if (symbol.Type.IsPrimitive == false)// TODO: DO this for all non-primitives probably
             {
                 // make room on stack and memcpy array into new space
@@ -521,6 +523,10 @@ namespace AntlrTest
                 return asm;
             }
             // NOTE: This might just always be DWORD.
+            if (symbol.Type.IdealSize != 4) {
+                return $"movzx eax, {symbol.Type.AsmType} {ScopeStack.GetSymbolOffsetString(symbolName)} ; load the value into eax\n" +
+                       $"push eax ; Push new value onto stack (This will always be DWORD.)\n";
+            }
             return $"push {symbol.Type.AsmType} {ScopeStack.GetSymbolOffsetString(symbolName)} ; Push {symbolName} value\n";
         }
 

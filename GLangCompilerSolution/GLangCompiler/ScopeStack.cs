@@ -101,7 +101,7 @@ namespace AntlrTest
         public class FunctionScope : IncrementingScope
         {
             public readonly GFunctionSignature Signature;
-            public FunctionScope(GFunctionSignature signature) : base (ScopeType.FUNCTION, 4, "_", "_")
+            public FunctionScope(GFunctionSignature signature) : base(ScopeType.FUNCTION, 4, "_", "_")
             {
                 Signature = signature;
             }
@@ -114,7 +114,7 @@ namespace AntlrTest
             public override int IncludeSymbol(string symbolName, GDataType type)
             {
                 if (symbolTable.ContainsKey(symbolName)) return -1;
-                
+
                 symbolTable.Add(symbolName, new GDataSymbol(symbolName, type, currentOffset));
                 int cacheOffset = currentOffset;
 
@@ -147,18 +147,21 @@ namespace AntlrTest
                 int size = VariableScope.Peek().CurrentOffset;
                 switch (type)
                 {
-                    case ScopeType.IF: {
-                        VariableScope.Push(new IncrementingScope(type, size, "_", "_"));
-                        return ifCounter++;
-                    }
-                    case ScopeType.WHILE: {
-                        VariableScope.Push(new IncrementingScope(type, size, $".__whileend_{whileCounter}", $".__while_{whileCounter}"));
-                        return whileCounter++;
-                    }
-                    case ScopeType.FOR: {
-                        VariableScope.Push(new IncrementingScope(type, size, $".__forend_{forCounter}", $".__forinc_{forCounter}"));
-                        return forCounter++;
-                    }
+                    case ScopeType.IF:
+                        {
+                            VariableScope.Push(new IncrementingScope(type, size, "_", "_"));
+                            return ifCounter++;
+                        }
+                    case ScopeType.WHILE:
+                        {
+                            VariableScope.Push(new IncrementingScope(type, size, $".__whileend_{whileCounter}", $".__while_{whileCounter}"));
+                            return whileCounter++;
+                        }
+                    case ScopeType.FOR:
+                        {
+                            VariableScope.Push(new IncrementingScope(type, size, $".__forend_{forCounter}", $".__forinc_{forCounter}"));
+                            return forCounter++;
+                        }
                     default: { throw new Exception("Failed to determine scope type."); }
                 }
             }
@@ -203,8 +206,8 @@ namespace AntlrTest
             {
                 Scope curr = VariableScope.ElementAt(i);
 
-                if (curr == scope) { foundScope = true;      }
-                if (foundScope)    { size += curr.LocalSize; }
+                if (curr == scope) { foundScope = true; }
+                if (foundScope) { size += curr.LocalSize; }
             }
             return size;
         }
