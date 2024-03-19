@@ -65,8 +65,8 @@ else_stmt
 	;
 
 variable_assignment
-	: SYMBOL_NAME COLON datatype EQUALS (expression | NULL_OP) #VaraibleDecl
-	| SYMBOL_NAME EQUALS expression #VaraibleStdAssign
+	: SYMBOL_NAME COLON datatype EQUALS (expression | NULL_OP) #VariableDecl
+	| SYMBOL_NAME EQUALS expression #VariableStdAssign
 	| DOLLAR SYMBOL_NAME EQUALS expression #VariableDerefAssign
 	| DOLLAR LPAREN expression RPAREN EQUALS expression #VariableDerefExprAssign
 	| SYMBOL_NAME PLUS PLUS #VariableIncrementAssign

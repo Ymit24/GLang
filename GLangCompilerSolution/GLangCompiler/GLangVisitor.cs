@@ -116,7 +116,7 @@ namespace AntlrTest
             return ASM;
         }
 
-        public override string VisitVaraibleDecl([NotNull] gLangParser.VaraibleDeclContext context)
+        public override string VisitVariableDecl([NotNull] gLangParser.VariableDeclContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
             string datatypeString = context.datatype().GetText();
@@ -165,7 +165,7 @@ namespace AntlrTest
             return asm;
         }
 
-        public override string VisitVaraibleStdAssign([NotNull] gLangParser.VaraibleStdAssignContext context)
+        public override string VisitVariableStdAssign([NotNull] gLangParser.VariableStdAssignContext context)
         {
             string symbolName = context.SYMBOL_NAME().GetText();
 
